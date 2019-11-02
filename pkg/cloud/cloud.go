@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/alice02/nifcloud-sdk-go-v2/nifcloud"
@@ -106,19 +105,6 @@ func NewCloud() (Cloud, error) {
 	accessKeyID := os.Getenv("NIFCLOUD_ACCESS_KEY_ID")
 	secretAccessKey := os.Getenv("NIFCLOUD_SECRET_ACCESS_KEY")
 	region := os.Getenv("NIFCLOUD_REGION")
-	if accessKeyID == "" {
-		return nil, errors.New("environment variable 'NIFCLOUD_ACCESS_KEY_ID' is required")
-	}
-	if secretAccessKey == "" {
-		return nil, errors.New("environment variable 'NIFCLOUD_SECRET_ACCESS_KEY' is required")
-	}
-	if region == "" {
-		klog.Info("'NIFCLOUD_REGION' is empty. Using default region jp-east-1")
-		region = "jp-east-1"
-	}
-	if !strings.HasPrefix(region, "jp-") {
-		region = "jp-" + region
-	}
 	cfg := nifcloud.NewConfig(accessKeyID, secretAccessKey, region)
 	return &cloud{
 		region:    region,
