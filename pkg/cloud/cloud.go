@@ -141,7 +141,7 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 
 	resp, err := req.Send(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("could not craete NIFCLOUD additional storage: %v", err)
+		return nil, fmt.Errorf("could not create NIFCLOUD additional storage: %v", err)
 	}
 
 	volumeID := aws.StringValue(resp.VolumeId)
