@@ -352,7 +352,7 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 		}
 	}
 	if volume == nil {
-		return nil, fmt.Errorf("specified volume name %q not found", name)
+		return nil, ErrNotFound
 	}
 
 	volSizeGiB, err := strconv.Atoi(aws.StringValue(volume.Size))
