@@ -346,8 +346,11 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 		return nil, fmt.Errorf("could not convert volume size %q: %v", aws.StringValue(volume.Size), err)
 	}
 
-	if int64(volSizeGiB) != util.BytesToGiB(capacityBytes) {
-		klog.Warningf("disk size for %q is not same. request capacityBytes: %v != volume size: %v", name, util.BytesToGiB(capacityBytes), volSizeGiB)
+	if int64(volSizeGiB) != roundUpCapacity(util.BytesToGiB(capacityBytes)) {
+		klog.Warningf(
+			"disk size for %q is not same. request capacityBytes: %v != volume size: %v",
+			name, roundUpCapacity(util.BytesToGiB(capacityBytes)), volSizeGiB,
+		)
 		return nil, ErrDiskExistsDiffSize
 	}
 
