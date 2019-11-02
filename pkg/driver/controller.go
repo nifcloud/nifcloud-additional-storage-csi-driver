@@ -345,5 +345,5 @@ func getInstanceID() (string, error) {
 		return "", fmt.Errorf("could not get instance id using vmtoolsd: %v (%v)", string(out), err)
 	}
 
-	return string(out), nil
+	return strings.TrimSpace(string(out)), nil
 }
