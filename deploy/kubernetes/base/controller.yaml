@@ -31,6 +31,8 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: NIFCLOUD_REGION
+              value: jp-east-1
             - name: NIFCLOUD_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
