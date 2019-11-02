@@ -478,7 +478,7 @@ func (n *nodeService) scanStorageDevices() error {
 				return nil
 			}
 
-			f, err := os.Open(path)
+			f, err := os.OpenFile(path, os.O_WRONLY, os.ModePerm)
 			if err != nil {
 				return err
 			}
@@ -506,7 +506,7 @@ func (n *nodeService) removeStorageDevice(dev string) error {
 		return nil
 	}
 
-	f, err := os.Open(removeDevicePath)
+	f, err := os.OpenFile(removeDevicePath, os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return err
 	}
