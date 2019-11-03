@@ -12,7 +12,7 @@ require (
 	google.golang.org/grpc v1.19.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog v1.0.0
-	k8s.io/kubernetes v1.15.2
+	k8s.io/kubernetes v1.15.3
 )
 
 replace k8s.io/api => k8s.io/api v0.0.0-20190819141258-3544db3b9e44
