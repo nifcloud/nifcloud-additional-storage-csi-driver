@@ -9,10 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alice02/nifcloud-sdk-go-v2/nifcloud"
-	"github.com/alice02/nifcloud-sdk-go-v2/service/computing"
 	dm "github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud/devicemanager"
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aokumasan/nifcloud-sdk-go-v2/nifcloud"
+	"github.com/aokumasan/nifcloud-sdk-go-v2/service/computing"
 	"github.com/aws/aws-sdk-go-v2/aws/awserr"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -138,8 +137,8 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		AccountingType: nifcloud.String("2"), // TODO: set accounting type from diskoptions
 		DiskType:       nifcloud.String(createType),
 		InstanceId:     nifcloud.String(instanceID),
-		Size:           aws.Int64(capacity),
-		Description:    aws.String(volumeName),
+		Size:           nifcloud.Int64(capacity),
+		Description:    nifcloud.String(volumeName),
 	})
 
 	resp, err := req.Send(ctx)
@@ -147,19 +146,19 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		return nil, fmt.Errorf("could not create NIFCLOUD additional storage: %v", err)
 	}
 
-	volumeID := aws.StringValue(resp.VolumeId)
+	volumeID := nifcloud.StringValue(resp.VolumeId)
 	if len(volumeID) == 0 {
 		return nil, fmt.Errorf("volume ID was not returned by CreateVolume")
 	}
 
-	zone := aws.StringValue(resp.AvailabilityZone)
+	zone := nifcloud.StringValue(resp.AvailabilityZone)
 	if len(zone) == 0 {
 		return nil, fmt.Errorf("availability zone was not returned by CreateVolume")
 	}
 
-	createdSize, err := strconv.Atoi(aws.StringValue(resp.Size))
+	createdSize, err := strconv.Atoi(nifcloud.StringValue(resp.Size))
 	if err != nil {
-		return nil, fmt.Errorf("cannot convert disk size %q", aws.StringValue(resp.Size))
+		return nil, fmt.Errorf("cannot convert disk size %q", nifcloud.StringValue(resp.Size))
 	}
 	if createdSize == 0 {
 		return nil, fmt.Errorf("disk size was not returned by CreateVolume")
@@ -170,7 +169,7 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 	}
 
 	detachVolumeRequest := c.computing.DetachVolumeRequest(&computing.DetachVolumeInput{
-		Agreement:  aws.Bool(true),
+		Agreement:  nifcloud.Bool(true),
 		InstanceId: nifcloud.String(instanceID),
 		VolumeId:   nifcloud.String(volumeID),
 	})
@@ -279,7 +278,7 @@ func (c *cloud) DetachDisk(ctx context.Context, volumeID, nodeID string) error {
 	_, err = c.computing.DetachVolumeRequest(&computing.DetachVolumeInput{
 		InstanceId: nifcloud.String(nodeID),
 		VolumeId:   nifcloud.String(volumeID),
-		Agreement:  aws.Bool(true),
+		Agreement:  nifcloud.Bool(true),
 	}).Send(ctx)
 	if err != nil {
 		return fmt.Errorf("could not detach volume %q from node %q: %v", volumeID, nodeID, err)
@@ -303,20 +302,20 @@ func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
 	for _, volume := range response.DescribeVolumesOutput.VolumeSet {
 		// Volume name was setted in volume description.
 		// So use description to check this volume was created by Kubernetes CSI driver.
-		if !strings.HasPrefix(aws.StringValue(volume.Description), "pvc-") {
+		if !strings.HasPrefix(nifcloud.StringValue(volume.Description), "pvc-") {
 			continue
 		}
 
-		volSize, err := strconv.Atoi(aws.StringValue(volume.Size))
+		volSize, err := strconv.Atoi(nifcloud.StringValue(volume.Size))
 		if err != nil {
-			klog.Warningf("could not convert volume size %q. using 100GiB...: %v", aws.StringValue(volume.Size), err)
+			klog.Warningf("could not convert volume size %q. using 100GiB...: %v", nifcloud.StringValue(volume.Size), err)
 			volSize = 100
 		}
 
 		disks = append(disks, &Disk{
-			VolumeID:           aws.StringValue(volume.VolumeId),
+			VolumeID:           nifcloud.StringValue(volume.VolumeId),
 			CapacityGiB:        int64(volSize),
-			AvailabilityZone:   aws.StringValue(volume.AvailabilityZone),
+			AvailabilityZone:   nifcloud.StringValue(volume.AvailabilityZone),
 			AttachedInstanceID: getVolumeAttachedInstanceID(&volume),
 		})
 	}
@@ -378,9 +377,9 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 		return nil, ErrNotFound
 	}
 
-	volSizeGiB, err := strconv.Atoi(aws.StringValue(volume.Size))
+	volSizeGiB, err := strconv.Atoi(nifcloud.StringValue(volume.Size))
 	if err != nil {
-		return nil, fmt.Errorf("could not convert volume size %q: %v", aws.StringValue(volume.Size), err)
+		return nil, fmt.Errorf("could not convert volume size %q: %v", nifcloud.StringValue(volume.Size), err)
 	}
 
 	if int64(volSizeGiB) != roundUpCapacity(util.BytesToGiB(capacityBytes)) {
@@ -392,9 +391,9 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 	}
 
 	return &Disk{
-		VolumeID:           aws.StringValue(volume.VolumeId),
+		VolumeID:           nifcloud.StringValue(volume.VolumeId),
 		CapacityGiB:        int64(volSizeGiB),
-		AvailabilityZone:   aws.StringValue(volume.AvailabilityZone),
+		AvailabilityZone:   nifcloud.StringValue(volume.AvailabilityZone),
 		AttachedInstanceID: getVolumeAttachedInstanceID(volume),
 	}, nil
 }
@@ -409,15 +408,15 @@ func (c *cloud) GetDiskByID(ctx context.Context, volumeID string) (*Disk, error)
 		return nil, err
 	}
 
-	volSize, err := strconv.Atoi(aws.StringValue(volume.Size))
+	volSize, err := strconv.Atoi(nifcloud.StringValue(volume.Size))
 	if err != nil {
-		return nil, fmt.Errorf("could not convert volume size %q: %v", aws.StringValue(volume.Size), err)
+		return nil, fmt.Errorf("could not convert volume size %q: %v", nifcloud.StringValue(volume.Size), err)
 	}
 
 	return &Disk{
-		VolumeID:           aws.StringValue(volume.VolumeId),
+		VolumeID:           nifcloud.StringValue(volume.VolumeId),
 		CapacityGiB:        int64(volSize),
-		AvailabilityZone:   aws.StringValue(volume.AvailabilityZone),
+		AvailabilityZone:   nifcloud.StringValue(volume.AvailabilityZone),
 		AttachedInstanceID: getVolumeAttachedInstanceID(volume),
 	}, nil
 }
@@ -534,8 +533,8 @@ func (c *cloud) getDeviceNameFromVolumeID(ctx context.Context, instanceID, volum
 	}
 
 	for _, blockDevice := range response.BlockDeviceMapping {
-		if aws.StringValue(blockDevice.Ebs.VolumeId) == volumeID {
-			return aws.StringValue(blockDevice.DeviceName), nil
+		if nifcloud.StringValue(blockDevice.Ebs.VolumeId) == volumeID {
+			return nifcloud.StringValue(blockDevice.DeviceName), nil
 		}
 	}
 
@@ -575,7 +574,7 @@ func roundUpCapacity(capacityGiB int64) int64 {
 func getVolumeAttachedInstanceID(volume *computing.VolumeSetItem) string {
 	var attachedInstanceID string
 	if len(volume.AttachmentSet) == 1 {
-		attachedInstanceID = aws.StringValue(volume.AttachmentSet[0].InstanceId)
+		attachedInstanceID = nifcloud.StringValue(volume.AttachmentSet[0].InstanceId)
 	} else {
 		attachedInstanceID = ""
 	}

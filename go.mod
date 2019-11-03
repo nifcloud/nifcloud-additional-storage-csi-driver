@@ -3,8 +3,8 @@ module github.com/aokumasan/nifcloud-additional-storage-csi-driver
 go 1.13
 
 require (
-	github.com/alice02/nifcloud-sdk-go-v2 v0.0.2
-	github.com/aws/aws-sdk-go-v2 v0.14.0
+	github.com/aokumasan/nifcloud-sdk-go-v2 v0.0.4
+	github.com/aws/aws-sdk-go-v2 v0.15.0
 	github.com/container-storage-interface/spec v1.2.0
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/kubernetes-sigs/aws-ebs-csi-driver v0.4.0

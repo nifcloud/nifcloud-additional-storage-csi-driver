@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alice02/nifcloud-sdk-go-v2/service/computing"
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aokumasan/nifcloud-sdk-go-v2/nifcloud"
+	"github.com/aokumasan/nifcloud-sdk-go-v2/service/computing"
 	"k8s.io/klog"
 )
 
@@ -182,21 +182,19 @@ func (d *deviceManager) release(device *Device) error {
 // getDeviceNamesInUse returns the device to volume ID mapping
 // the mapping includes both already attached and being attached volumes
 func (d *deviceManager) getDeviceNamesInUse(instance *computing.InstancesSetItem) map[string]string {
-	nodeID := aws.StringValue(instance.InstanceId)
+	nodeID := nifcloud.StringValue(instance.InstanceId)
 	inUse := map[string]string{}
 	for _, blockDevice := range instance.BlockDeviceMapping {
-		name := aws.StringValue(blockDevice.DeviceName)
+		name := nifcloud.StringValue(blockDevice.DeviceName)
 		if !strings.HasPrefix(name, "SCSI") {
-			klog.Warningf("Unexpected additional storage DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
+			klog.Warningf("Unexpected additional storage DeviceName: %q", nifcloud.StringValue(blockDevice.DeviceName))
 		}
-		inUse[name] = aws.StringValue(blockDevice.Ebs.VolumeId)
+		inUse[name] = nifcloud.StringValue(blockDevice.Ebs.VolumeId)
 	}
-	klog.V(4).Infof("getDeviceNamesInUse: after search BlockDeviceMapping: %v", inUse)
 
 	for name, volumeID := range d.inFlight.GetNames(nodeID) {
 		inUse[name] = volumeID
 	}
-	klog.V(4).Infof("getDeviceNamesInUse: after search d.inFlight.GetNames: %v", inUse)
 
 	return inUse
 }
@@ -214,5 +212,5 @@ func getInstanceID(instance *computing.InstancesSetItem) (string, error) {
 	if instance == nil {
 		return "", fmt.Errorf("can't get ID from a nil instance")
 	}
-	return aws.StringValue(instance.InstanceId), nil
+	return nifcloud.StringValue(instance.InstanceId), nil
 }
