@@ -29,7 +29,6 @@ spec:
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
-            - --v=10
           env:
             - name: CSI_ENDPOINT
               value: unix:/csi/csi.sock
