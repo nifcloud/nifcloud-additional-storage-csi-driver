@@ -479,6 +479,10 @@ func (n *nodeService) scanStorageDevices() error {
 				return nil
 			}
 
+			if info.Name() != "scan" {
+				return nil
+			}
+
 			f, err := os.OpenFile(path, os.O_WRONLY, os.ModePerm)
 			if err != nil {
 				return err
