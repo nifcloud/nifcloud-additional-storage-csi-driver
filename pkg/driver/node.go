@@ -438,7 +438,8 @@ func (n *nodeService) findDevicePath(scsiID string) (string, error) {
 	}
 	deviceNumber := string(match[1])
 
-	files, err := ioutil.ReadDir("/dev/disk/by-path")
+	deviceFileDir := "/dev/disk/by-path"
+	files, err := ioutil.ReadDir(deviceFileDir)
 	if err != nil {
 		return "", fmt.Errorf("could not list the files in /dev/disk/by-path/: %v", err)
 	}
@@ -447,7 +448,7 @@ func (n *nodeService) findDevicePath(scsiID string) (string, error) {
 	deviceFileRegexp := regexp.MustCompile(fmt.Sprintf(`^pci-\d{4}:\d{2}:\d{2}\.\d-scsi-0:0:%s:0$`, deviceNumber))
 	for _, f := range files {
 		if deviceFileRegexp.MatchString(f.Name()) {
-			devicePath, err = filepath.EvalSymlinks(f.Name())
+			devicePath, err = filepath.EvalSymlinks(filepath.Join(deviceFileDir, f.Name()))
 			if err != nil {
 				return "", fmt.Errorf("could not eval symlynk for %q: %v", f.Name(), err)
 			}
