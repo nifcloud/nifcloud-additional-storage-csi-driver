@@ -186,7 +186,7 @@ func (d *deviceManager) getDeviceNamesInUse(instance *computing.InstancesSetItem
 	inUse := map[string]string{}
 	for _, blockDevice := range instance.BlockDeviceMapping {
 		name := aws.StringValue(blockDevice.DeviceName)
-		if strings.HasPrefix(name, "SCSI") {
+		if !strings.HasPrefix(name, "SCSI") {
 			klog.Warningf("Unexpected additional storage DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
 		}
 		inUse[name] = aws.StringValue(blockDevice.Ebs.VolumeId)
