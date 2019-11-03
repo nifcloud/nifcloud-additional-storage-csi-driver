@@ -3,16 +3,16 @@
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
-  name: additional-storage-csi-node
+  name: nifcloud-storage-csi-node
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: additional-storage-csi-node
+      app: nifcloud-storage-csi-node
   template:
     metadata:
       labels:
-        app: additional-storage-csi-node
+        app: nifcloud-storage-csi-node
     spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
@@ -22,7 +22,7 @@ spec:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
-        - name: additional-storage-plugin
+        - name: nifcloud-storage-driver
           securityContext:
             privileged: true
           image: aokumasan/nifcloud-additional-storage-csi-driver:latest

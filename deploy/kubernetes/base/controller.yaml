@@ -3,26 +3,26 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: additional-storage-csi-controller
+  name: nifcloud-storage-csi-controller
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: additional-storage-csi-controller
+      app: nifcloud-storage-csi-controller
   template:
     metadata:
       labels:
-        app: additional-storage-csi-controller
+        app: nifcloud-storage-csi-controller
     spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
-      serviceAccount: additional-storage-csi-controller-sa
+      serviceAccount: nifcloud-storage-csi-controller-sa
       priorityClassName: system-cluster-critical
       tolerations:
         - key: CriticalAddonsOnly
           operator: Exists
       containers:
-        - name: additonal-storage-plugin
+        - name: nifcloud-storage-driver
           image: aokumasan/nifcloud-additional-storage-csi-driver:latest
           args :
             - --endpoint=$(CSI_ENDPOINT)
