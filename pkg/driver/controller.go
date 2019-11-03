@@ -26,6 +26,8 @@ var (
 	controllerCaps = []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
+		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
+		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
 	}
 )
 
@@ -230,7 +232,26 @@ func (d *controllerService) GetCapacity(ctx context.Context, req *csi.GetCapacit
 
 func (d *controllerService) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	klog.V(4).Infof("ListVolumes: called with args %+v", *req)
-	return nil, status.Error(codes.Unimplemented, "")
+	disks, err := d.cloud.ListDisks(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not fetch the additional storage lists: %v", err)
+	}
+
+	entries := []*csi.ListVolumesResponse_Entry{}
+	for _, d := range disks {
+		entries = append(entries, &csi.ListVolumesResponse_Entry{
+			Volume: &csi.Volume{
+				VolumeId: d.VolumeID,
+			},
+			Status: &csi.ListVolumesResponse_VolumeStatus{
+				PublishedNodeIds: []string{d.AttachedInstanceID},
+			},
+		})
+	}
+
+	return &csi.ListVolumesResponse{
+		Entries: entries,
+	}, nil
 }
 
 func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {

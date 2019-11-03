@@ -5,7 +5,8 @@ go 1.13
 require (
 	github.com/alice02/nifcloud-sdk-go-v2 v0.0.2
 	github.com/aws/aws-sdk-go-v2 v0.14.0
-	github.com/container-storage-interface/spec v1.1.0
+	github.com/container-storage-interface/spec v1.2.0
+	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/kubernetes-sigs/aws-ebs-csi-driver v0.4.0
 	github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de
 	google.golang.org/grpc v1.19.0
