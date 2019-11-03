@@ -5,7 +5,7 @@ apiVersion: apps/v1
 metadata:
   name: additional-storage-csi-controller
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: additional-storage-csi-controller
