@@ -275,6 +275,7 @@ func (c *cloud) DetachDisk(ctx context.Context, volumeID, nodeID string) error {
 	_, err = c.computing.DetachVolumeRequest(&computing.DetachVolumeInput{
 		InstanceId: nifcloud.String(nodeID),
 		VolumeId:   nifcloud.String(volumeID),
+		Agreement:  aws.Bool(true),
 	}).Send(ctx)
 	if err != nil {
 		return fmt.Errorf("could not detach volume %q from node %q: %v", volumeID, nodeID, err)
