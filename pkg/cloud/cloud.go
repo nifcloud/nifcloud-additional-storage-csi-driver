@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alice02/nifcloud-sdk-go-v2/nifcloud"
@@ -68,9 +69,10 @@ var (
 
 // Disk represents a NIFCLOUD additional storage
 type Disk struct {
-	VolumeID         string
-	CapacityGiB      int64
-	AvailabilityZone string
+	VolumeID           string
+	CapacityGiB        int64
+	AvailabilityZone   string
+	AttachedInstanceID string
 }
 
 // DiskOptions represents parameters to create an NIFCLOUD additional storage
@@ -86,6 +88,7 @@ type Cloud interface {
 	DeleteDisk(ctx context.Context, volumeID string) (success bool, err error)
 	AttachDisk(ctx context.Context, volumeID string, nodeID string) (devicePath string, err error)
 	DetachDisk(ctx context.Context, volumeID string, nodeID string) (err error)
+	ListDisks(ctx context.Context) (disks []*Disk, err error)
 	WaitForAttachmentState(ctx context.Context, volumeID, state string) error
 	GetDiskByName(ctx context.Context, name string, capacityBytes int64) (disk *Disk, err error)
 	GetDiskByID(ctx context.Context, volumeID string) (disk *Disk, err error)
@@ -181,9 +184,10 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 	}
 
 	return &Disk{
-		CapacityGiB:      int64(createdSize),
-		VolumeID:         volumeID,
-		AvailabilityZone: zone,
+		CapacityGiB:        int64(createdSize),
+		VolumeID:           volumeID,
+		AvailabilityZone:   zone,
+		AttachedInstanceID: "",
 	}, nil
 }
 
@@ -288,6 +292,38 @@ func (c *cloud) DetachDisk(ctx context.Context, volumeID, nodeID string) error {
 	return nil
 }
 
+func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
+	request := c.computing.DescribeVolumesRequest(nil)
+	response, err := request.Send(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("clould not fetch the additional storages: %v", err)
+	}
+
+	disks := []*Disk{}
+	for _, volume := range response.DescribeVolumesOutput.VolumeSet {
+		// Volume name was setted in volume description.
+		// So use description to check this volume was created by Kubernetes CSI driver.
+		if !strings.HasPrefix(aws.StringValue(volume.Description), "pvc-") {
+			continue
+		}
+
+		volSize, err := strconv.Atoi(aws.StringValue(volume.Size))
+		if err != nil {
+			klog.Warningf("could not convert volume size %q. using 100GiB...: %v", aws.StringValue(volume.Size), err)
+			volSize = 100
+		}
+
+		disks = append(disks, &Disk{
+			VolumeID:           aws.StringValue(volume.VolumeId),
+			CapacityGiB:        int64(volSize),
+			AvailabilityZone:   aws.StringValue(volume.AvailabilityZone),
+			AttachedInstanceID: getVolumeAttachedInstanceID(&volume),
+		})
+	}
+
+	return disks, nil
+}
+
 func (c *cloud) WaitForAttachmentState(ctx context.Context, volumeID, state string) error {
 	backoff := wait.Backoff{
 		Duration: 3 * time.Second,
@@ -356,9 +392,10 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 	}
 
 	return &Disk{
-		VolumeID:         aws.StringValue(volume.VolumeId),
-		CapacityGiB:      int64(volSizeGiB),
-		AvailabilityZone: aws.StringValue(volume.AvailabilityZone),
+		VolumeID:           aws.StringValue(volume.VolumeId),
+		CapacityGiB:        int64(volSizeGiB),
+		AvailabilityZone:   aws.StringValue(volume.AvailabilityZone),
+		AttachedInstanceID: getVolumeAttachedInstanceID(volume),
 	}, nil
 }
 
@@ -378,9 +415,10 @@ func (c *cloud) GetDiskByID(ctx context.Context, volumeID string) (*Disk, error)
 	}
 
 	return &Disk{
-		VolumeID:         aws.StringValue(volume.VolumeId),
-		CapacityGiB:      int64(volSize),
-		AvailabilityZone: aws.StringValue(volume.AvailabilityZone),
+		VolumeID:           aws.StringValue(volume.VolumeId),
+		CapacityGiB:        int64(volSize),
+		AvailabilityZone:   aws.StringValue(volume.AvailabilityZone),
+		AttachedInstanceID: getVolumeAttachedInstanceID(volume),
 	}, nil
 }
 
@@ -532,4 +570,14 @@ func roundUpCapacity(capacityGiB int64) int64 {
 		return util.RoundUpGiB(capacityGiB)
 	}
 	return (util.RoundUpGiB(capacityGiB)/unit + 1) * unit
+}
+
+func getVolumeAttachedInstanceID(volume *computing.VolumeSetItem) string {
+	var attachedInstanceID string
+	if len(volume.AttachmentSet) == 1 {
+		attachedInstanceID = aws.StringValue(volume.AttachmentSet[0].InstanceId)
+	} else {
+		attachedInstanceID = ""
+	}
+	return attachedInstanceID
 }
