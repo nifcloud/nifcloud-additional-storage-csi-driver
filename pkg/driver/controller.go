@@ -30,13 +30,13 @@ var (
 )
 
 type controllerService struct {
-	cloud         cloud.Cloud
-	driverOptions *DriverOptions
+	cloud                 cloud.Cloud
+	driverOptions         *DriverOptions
+	instanceIDForThisNode string
 }
 
 func newControllerService(driverOptions *DriverOptions) controllerService {
-	// check it can get the NIFCLOUD instance id from vmtoolsd.
-	_, err := getInstanceID()
+	instanceID, err := getInstanceID()
 	if err != nil {
 		panic(err)
 	}
@@ -47,8 +47,9 @@ func newControllerService(driverOptions *DriverOptions) controllerService {
 	}
 
 	return controllerService{
-		cloud:         cloud,
-		driverOptions: driverOptions,
+		cloud:                 cloud,
+		driverOptions:         driverOptions,
+		instanceIDForThisNode: instanceID,
 	}
 }
 
@@ -104,15 +105,10 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// create a new volume
-	instanceID, err := getInstanceID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get the instance id: %v", err)
-	}
-
 	opts := &cloud.DiskOptions{
 		CapacityBytes: volSizeBytes,
 		VolumeType:    volumeType,
-		InstanceID:    instanceID,
+		InstanceID:    d.instanceIDForThisNode,
 	}
 
 	disk, err = d.cloud.CreateDisk(ctx, volName, opts)
