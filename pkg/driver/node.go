@@ -52,16 +52,18 @@ var (
 
 // nodeService represents the node service of CSI driver
 type nodeService struct {
-	mounter  Mounter
-	inFlight *internal.InFlight
+	mounter    Mounter
+	inFlight   *internal.InFlight
+	instanceID string
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func newNodeService() nodeService {
+func newNodeService(instanceID string) nodeService {
 	return nodeService{
-		mounter:  newNodeMounter(),
-		inFlight: internal.NewInFlight(),
+		mounter:    newNodeMounter(),
+		inFlight:   internal.NewInFlight(),
+		instanceID: instanceID,
 	}
 }
 
@@ -318,20 +320,13 @@ func (n *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 
 func (n *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(4).Infof("NodeGetInfo: called with args %+v", *req)
-
-	// TODO: Get instance id from vmtoolsd or API
-	name, err := os.Hostname()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not get the hostname")
-	}
-
 	topology := &csi.Topology{
 		// TODO: Fix to get zone from API ?
 		Segments: map[string]string{TopologyKey: "east-11"},
 	}
 
 	return &csi.NodeGetInfoResponse{
-		NodeId:             name,
+		NodeId:             n.instanceID,
 		MaxVolumesPerNode:  defaultMaxVolumes,
 		AccessibleTopology: topology,
 	}, nil
