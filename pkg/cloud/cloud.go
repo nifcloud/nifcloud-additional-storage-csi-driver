@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -21,9 +22,11 @@ import (
 const (
 	// VolumeTypeStandard represents a general purpose volume.
 	VolumeTypeStandard = "standard"
-	// VolumeTypeHighSpeedA represents a high speed volume.
+	// VolumeTypeHighSpeed represents a high spped volume (randomly select type A or B)
+	VolumeTypeHighSpeed = "high-speed"
+	// VolumeTypeHighSpeedA represents a high speed volume (only use type A).
 	VolumeTypeHighSpeedA = "high-speed-a"
-	// VolumeTypeHighSpeedB represents a high speed volume.
+	// VolumeTypeHighSpeedB represents a high speed volume (only use type B).
 	VolumeTypeHighSpeedB = "high-speed-b"
 	// VolumeTypeFlash represents a flash volume.
 	VolumeTypeFlash = "flash"
@@ -120,6 +123,9 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 	switch diskOptions.VolumeType {
 	case VolumeTypeStandard, VolumeTypeHighSpeedA, VolumeTypeHighSpeedB, VolumeTypeFlash:
 		createType = VolumeTypeMapping[diskOptions.VolumeType]
+	case VolumeTypeHighSpeed:
+		types := []string{VolumeTypeHighSpeedA, VolumeTypeHighSpeedB}
+		createType = types[rand.Intn(len(types))]
 	case "":
 		createType = VolumeTypeMapping[DefaultVolumeType]
 	default:
