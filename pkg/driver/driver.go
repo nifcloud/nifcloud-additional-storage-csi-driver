@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 
+	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/common"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
 	"google.golang.org/grpc"
@@ -35,6 +36,11 @@ type DriverOptions struct {
 func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
 	klog.Infof("Driver: %v Version: %v", DriverName, driverVersion)
 
+	instanceID, err := common.GetInstanceID()
+	if err != nil {
+		panic(err)
+	}
+
 	driverOptions := DriverOptions{
 		endpoint: DefaultCSIEndpoint,
 	}
@@ -43,8 +49,8 @@ func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
 	}
 
 	driver := Driver{
-		controllerService: newControllerService(&driverOptions),
-		nodeService:       newNodeService(),
+		controllerService: newControllerService(instanceID),
+		nodeService:       newNodeService(instanceID),
 		options:           &driverOptions,
 	}
 

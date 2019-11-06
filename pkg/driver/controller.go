@@ -2,15 +2,12 @@ package driver
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	awsdriver "github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/driver"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
-	"github.com/mattn/go-shellwords"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
@@ -32,26 +29,19 @@ var (
 )
 
 type controllerService struct {
-	cloud                 cloud.Cloud
-	driverOptions         *DriverOptions
-	instanceIDForThisNode string
+	cloud      cloud.Cloud
+	instanceID string
 }
 
-func newControllerService(driverOptions *DriverOptions) controllerService {
-	instanceID, err := getInstanceID()
-	if err != nil {
-		panic(err)
-	}
-
+func newControllerService(instanceID string) controllerService {
 	cloud, err := cloud.NewCloud()
 	if err != nil {
 		panic(err)
 	}
 
 	return controllerService{
-		cloud:                 cloud,
-		driverOptions:         driverOptions,
-		instanceIDForThisNode: instanceID,
+		cloud:      cloud,
+		instanceID: instanceID,
 	}
 }
 
@@ -110,7 +100,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	opts := &cloud.DiskOptions{
 		CapacityBytes: volSizeBytes,
 		VolumeType:    volumeType,
-		InstanceID:    d.instanceIDForThisNode,
+		InstanceID:    d.instanceID,
 	}
 
 	disk, err = d.cloud.CreateDisk(ctx, volName, opts)
@@ -349,18 +339,4 @@ func getVolSizeBytes(req *csi.CreateVolumeRequest) (int64, error) {
 		}
 	}
 	return volSizeBytes, nil
-}
-
-func getInstanceID() (string, error) {
-	const cmd = "vmtoolsd --cmd 'info-get guestinfo.hostname'"
-	args, err := shellwords.Parse(cmd)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse command %q: %v", cmd, err)
-	}
-	out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("could not get instance id using vmtoolsd: %v (%v)", string(out), err)
-	}
-
-	return strings.TrimSpace(string(out)), nil
 }
