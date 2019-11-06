@@ -572,7 +572,7 @@ func roundUpCapacity(capacityGiB int64) int64 {
 	const unit = 100
 
 	if capacityGiB%unit == 0 {
-		return util.RoundUpGiB(capacityGiB)
+		return capacityGiB
 	}
 	return (util.RoundUpGiB(capacityGiB)/unit + 1) * unit
 }
