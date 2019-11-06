@@ -429,7 +429,7 @@ func (n *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeR
 
 func (n *nodeService) findDevicePath(scsiID string) (string, error) {
 	if !strings.HasPrefix(scsiID, "SCSI") {
-		return "", fmt.Errorf("invalid SCSI ID %q was specified. SCSI ID must be start with SCSI (0:?)")
+		return "", fmt.Errorf("invalid SCSI ID %q was specified. SCSI ID must be start with SCSI (0:?)", scsiID)
 	}
 	deviceNumberRegexp := regexp.MustCompile(`SCSI\s\(0:(.+)\)$`)
 	match := deviceNumberRegexp.FindSubmatch([]byte(scsiID))
