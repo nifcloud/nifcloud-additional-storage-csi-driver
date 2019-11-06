@@ -125,7 +125,7 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		createType = VolumeTypeMapping[diskOptions.VolumeType]
 	case VolumeTypeHighSpeed:
 		types := []string{VolumeTypeHighSpeedA, VolumeTypeHighSpeedB}
-		createType = types[rand.Intn(len(types))]
+		createType = VolumeTypeMapping[types[rand.Intn(len(types))]]
 	case "":
 		createType = VolumeTypeMapping[DefaultVolumeType]
 	default:
