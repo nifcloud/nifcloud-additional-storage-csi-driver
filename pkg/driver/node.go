@@ -320,9 +320,13 @@ func (n *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 
 func (n *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(4).Infof("NodeGetInfo: called with args %+v", *req)
+	zone := os.Getenv("NIFCLOUD_ZONE")
+	if zone == "" {
+		zone = "east-11"
+	}
+
 	topology := &csi.Topology{
-		// TODO: Fix to get zone from API ?
-		Segments: map[string]string{TopologyKey: "east-11"},
+		Segments: map[string]string{TopologyKey: zone},
 	}
 
 	return &csi.NodeGetInfoResponse{
