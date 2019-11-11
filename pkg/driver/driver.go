@@ -2,11 +2,14 @@ package driver
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"os/exec"
+	"strings"
 
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/common"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
+	"github.com/mattn/go-shellwords"
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 )
@@ -17,6 +20,8 @@ const (
 	// TopologyKey is key
 	TopologyKey = "topology." + DriverName + "/zone"
 )
+
+var execCommand = exec.Command
 
 // Driver is CSI driver object
 type Driver struct {
@@ -36,7 +41,7 @@ type DriverOptions struct {
 func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
 	klog.Infof("Driver: %v Version: %v", DriverName, driverVersion)
 
-	instanceID, err := common.GetInstanceID()
+	instanceID, err := getInstanceIDFromGuestInfo()
 	if err != nil {
 		panic(err)
 	}
@@ -101,4 +106,18 @@ func WithEndpoint(endpoint string) func(*DriverOptions) {
 	return func(o *DriverOptions) {
 		o.endpoint = endpoint
 	}
+}
+
+func getInstanceIDFromGuestInfo() (string, error) {
+	const cmd = "vmtoolsd --cmd 'info-get guestinfo.hostname'"
+	args, err := shellwords.Parse(cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse command %q: %v", cmd, err)
+	}
+	out, err := execCommand(args[0], args[1:]...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("could not get instance id from vmtoolsd: %v (%v)", string(out), err)
+	}
+
+	return strings.TrimSpace(string(out)), nil
 }
