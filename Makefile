@@ -9,6 +9,9 @@ build:
 	mkdir -p bin
 	CGO_ENABLED=0 GOOS=linux go build -ldflags ${LDFLAGS} -o bin/nifcloud-additional-storage-csi-driver ./cmd/
 
+test:
+	go test -cover ./...
+
 image:
 	docker build -t $(IMAGE):latest .
 
