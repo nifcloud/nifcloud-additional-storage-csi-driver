@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	dm "github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud/devicemanager"
 	"github.com/aokumasan/nifcloud-sdk-go-v2/nifcloud"
 	"github.com/aokumasan/nifcloud-sdk-go-v2/service/computing"
 	"github.com/aws/aws-sdk-go-v2/aws/awserr"
@@ -100,7 +99,6 @@ type Cloud interface {
 type cloud struct {
 	region    string
 	computing *computing.Client
-	dm        dm.DeviceManager
 }
 
 var _ Cloud = &cloud{}
@@ -114,7 +112,6 @@ func NewCloud() (Cloud, error) {
 	return &cloud{
 		region:    region,
 		computing: computing.New(cfg),
-		dm:        dm.NewDeviceManager(),
 	}, nil
 }
 
@@ -208,38 +205,24 @@ func (c *cloud) DeleteDisk(ctx context.Context, volumeID string) (bool, error) {
 }
 
 func (c *cloud) AttachDisk(ctx context.Context, volumeID, nodeID string) (string, error) {
-	instance, err := c.getInstance(ctx, nodeID)
+	resp, err := c.computing.AttachVolumeRequest(
+		&computing.AttachVolumeInput{
+			InstanceId: nifcloud.String(nodeID),
+			VolumeId:   nifcloud.String(volumeID),
+		},
+	).Send(ctx)
 	if err != nil {
-		return "", err
-	}
-
-	device, err := c.dm.NewDevice(instance, volumeID)
-	if err != nil {
-		return "", err
-	}
-	defer device.Release(false)
-
-	if !device.IsAlreadyAssigned {
-		resp, err := c.computing.AttachVolumeRequest(
-			&computing.AttachVolumeInput{
-				InstanceId: nifcloud.String(nodeID),
-				VolumeId:   nifcloud.String(volumeID),
-			},
-		).Send(ctx)
-		if err != nil {
-			if awsErr, ok := err.(awserr.Error); ok {
-				if awsErr.Code() == "Server.Inoperable.Volume.AlreadyAttached" {
-					return "", ErrAlreadyExists
-				}
+		if awsErr, ok := err.(awserr.Error); ok {
+			if awsErr.Code() == "Server.Inoperable.Volume.AlreadyAttached" {
+				return "", ErrAlreadyExists
 			}
-			return "", fmt.Errorf("could not attach volume %q to node %q: %v", volumeID, nodeID, err)
 		}
-		klog.V(5).Infof("AttachVolume volume=%q instance=%q request returned %v", volumeID, nodeID, resp)
+		return "", fmt.Errorf("could not attach volume %q to node %q: %v", volumeID, nodeID, err)
 	}
+	klog.V(5).Infof("AttachVolume volume=%q instance=%q request returned %v", volumeID, nodeID, resp)
 
 	// This is the only situation where we taint the device
 	if err := c.WaitForAttachmentState(ctx, volumeID, "attached"); err != nil {
-		device.Taint()
 		return "", err
 	}
 
@@ -248,40 +231,15 @@ func (c *cloud) AttachDisk(ctx context.Context, volumeID, nodeID string) (string
 		return "", fmt.Errorf("could not fetch the device name after attach volume: %v", err)
 	}
 
-	if device.Path == "" {
-		device.Path = deviceName
-	}
-
-	if device.Path != deviceName {
-		klog.Warningf("device path does not match: device.Path: %v, deviceName: %v", device.Path, deviceName)
-		device.Path = deviceName
-	}
-
 	// TODO: Double check the attachment to be 100% sure we attached the correct volume at the correct mountpoint
 	// It could happen otherwise that we see the volume attached from a previous/separate AttachVolume call,
 	// which could theoretically be against a different device (or even instance).
 
-	return device.Path, nil
+	return deviceName, nil
 }
 
 func (c *cloud) DetachDisk(ctx context.Context, volumeID, nodeID string) error {
-	instance, err := c.getInstance(ctx, nodeID)
-	if err != nil {
-		return err
-	}
-
-	// TODO: check if attached
-	device, err := c.dm.GetDevice(instance, volumeID)
-	if err != nil {
-		return err
-	}
-	defer device.Release(true)
-
-	if !device.IsAlreadyAssigned {
-		klog.Warningf("DetachDisk called on non-attached volume: %s", volumeID)
-	}
-
-	_, err = c.computing.DetachVolumeRequest(&computing.DetachVolumeInput{
+	_, err := c.computing.DetachVolumeRequest(&computing.DetachVolumeInput{
 		InstanceId: nifcloud.String(nodeID),
 		VolumeId:   nifcloud.String(volumeID),
 		Agreement:  nifcloud.Bool(true),
