@@ -10,6 +10,7 @@ require (
 	github.com/kubernetes-sigs/aws-ebs-csi-driver v0.4.0
 	github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver v0.6.0
 	github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de
+	github.com/stretchr/testify v1.2.2
 	google.golang.org/grpc v1.19.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog v1.0.0
