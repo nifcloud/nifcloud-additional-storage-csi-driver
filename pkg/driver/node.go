@@ -194,7 +194,6 @@ func (n *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	// remove storage device
-	// https://pfs.nifcloud.com/guide/cp/login/detach_linux.htm
 	klog.Infof("removing storage device of %q", dev)
 	if err := n.removeStorageDevice(dev); err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not remove the storage device: %v", err)
@@ -482,6 +481,8 @@ func (n *nodeService) findDevicePath(scsiID string) (string, error) {
 	return "", fmt.Errorf("device path not found: %s", devicePath)
 }
 
+// scanStorageDevices online scan the new storage device
+// More info: https://pfs.nifcloud.com/guide/cp/login/mount_linux.htm
 func (n *nodeService) scanStorageDevices() error {
 	scanTargets := []string{"/sys/class/scsi_host", "/sys/devices"}
 	for _, target := range scanTargets {
@@ -515,6 +516,8 @@ func (n *nodeService) scanStorageDevices() error {
 	return nil
 }
 
+// removeStorageDevice online detach the specified storage
+// More info: https://pfs.nifcloud.com/guide/cp/login/detach_linux.htm
 func (n *nodeService) removeStorageDevice(dev string) error {
 	removeDevicePath := "/sys/block/" + dev + "/device/delete"
 	if _, err := os.Stat(removeDevicePath); err != nil {
