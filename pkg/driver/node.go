@@ -9,9 +9,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/driver/internal"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	awsdriver "github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/driver"
+	gcpcommon "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pkg/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
@@ -52,18 +52,18 @@ var (
 
 // nodeService represents the node service of CSI driver
 type nodeService struct {
-	mounter    Mounter
-	inFlight   *internal.InFlight
-	instanceID string
+	mounter     Mounter
+	volumeLocks *gcpcommon.VolumeLocks
+	instanceID  string
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
 func newNodeService(instanceID string) nodeService {
 	return nodeService{
-		mounter:    newNodeMounter(),
-		inFlight:   internal.NewInFlight(),
-		instanceID: instanceID,
+		mounter:     newNodeMounter(),
+		volumeLocks: gcpcommon.NewVolumeLocks(),
+		instanceID:  instanceID,
 	}
 }
 
@@ -107,13 +107,10 @@ func (n *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		fsType = defaultFsType
 	}
 
-	if ok := n.inFlight.Insert(req); !ok {
-		return nil, status.Errorf(codes.Internal, "request to stage volume=%q is already in progress", volumeID)
+	if acquire := n.volumeLocks.TryAcquire(volumeID); !acquire {
+		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
 	}
-	defer func() {
-		klog.V(4).Infof("NodeStageVolume: volume=%q operation finished", volumeID)
-		n.inFlight.Delete(req)
-	}()
+	defer n.volumeLocks.Release(volumeID)
 
 	devicePath, ok := req.PublishContext[awsdriver.DevicePathKey]
 	if !ok {
@@ -184,6 +181,11 @@ func (n *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	if refCount > 1 {
 		klog.Warningf("NodeUnstageVolume: found %d references to device %s mounted at target path %s", refCount, dev, target)
 	}
+
+	if acquire := n.volumeLocks.TryAcquire(volumeID); !acquire {
+		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	}
+	defer n.volumeLocks.Release(volumeID)
 
 	klog.V(5).Infof("NodeUnstageVolume: unmounting %s", target)
 	err = n.mounter.Unmount(target)
@@ -258,6 +260,11 @@ func (n *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Errorf(codes.InvalidArgument, "Volume capability not supported: %v", volCap)
 	}
 
+	if acquire := n.volumeLocks.TryAcquire(volumeID); !acquire {
+		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	}
+	defer n.volumeLocks.Release(volumeID)
+
 	mountOptions := []string{"bind"}
 	if req.GetReadonly() {
 		mountOptions = append(mountOptions, "ro")
@@ -277,7 +284,7 @@ func (n *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+func (n *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	klog.V(4).Infof("NodeUnpublishVolume: called with args %+v", *req)
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -289,8 +296,13 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
 
+	if acquire := n.volumeLocks.TryAcquire(volumeID); !acquire {
+		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	}
+	defer n.volumeLocks.Release(volumeID)
+
 	klog.V(5).Infof("NodeUnpublishVolume: unmounting %s", target)
-	err := d.mounter.Unmount(target)
+	err := n.mounter.Unmount(target)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}

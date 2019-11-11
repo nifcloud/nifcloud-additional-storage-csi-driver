@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/common"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	awsdriver "github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/driver"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
+	gcpcommon "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pkg/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
@@ -31,7 +31,7 @@ var (
 
 type controllerService struct {
 	cloud       cloud.Cloud
-	volumeLocks *common.VolumeLocks
+	volumeLocks *gcpcommon.VolumeLocks
 	instanceID  string
 }
 
@@ -44,7 +44,7 @@ func newControllerService(instanceID string) controllerService {
 	return controllerService{
 		cloud:       cloud,
 		instanceID:  instanceID,
-		volumeLocks: common.NewVolumeLocks(),
+		volumeLocks: gcpcommon.NewVolumeLocks(),
 	}
 }
 

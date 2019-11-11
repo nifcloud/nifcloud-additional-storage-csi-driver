@@ -8,6 +8,7 @@ require (
 	github.com/container-storage-interface/spec v1.2.0
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/kubernetes-sigs/aws-ebs-csi-driver v0.4.0
+	github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver v0.6.0
 	github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de
 	google.golang.org/grpc v1.19.0
 	k8s.io/apimachinery v0.0.0
