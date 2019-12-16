@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	awsdriver "github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/driver"
 	gcpcommon "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pkg/common"
@@ -52,6 +53,7 @@ var (
 
 // nodeService represents the node service of CSI driver
 type nodeService struct {
+	cloud       cloud.Cloud
 	mounter     Mounter
 	volumeLocks *gcpcommon.VolumeLocks
 	instanceID  string
@@ -60,7 +62,13 @@ type nodeService struct {
 // newNodeService creates a new node service
 // it panics if failed to create the service
 func newNodeService(instanceID string) nodeService {
+	cloud, err := cloud.NewCloud()
+	if err != nil {
+		panic(err)
+	}
+
 	return nodeService{
+		cloud:       cloud,
 		mounter:     newNodeMounter(),
 		volumeLocks: gcpcommon.NewVolumeLocks(),
 		instanceID:  instanceID,
@@ -333,7 +341,11 @@ func (n *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	klog.V(4).Infof("NodeGetInfo: called with args %+v", *req)
 	zone := os.Getenv("NIFCLOUD_ZONE")
 	if zone == "" {
-		zone = "east-11"
+		instance, err := n.cloud.GetInstanceByName(ctx, n.instanceID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Failed to get instance info for %q: %v", n.instanceID, err)
+		}
+		zone = instance.AvailabilityZone
 	}
 
 	topology := &csi.Topology{
