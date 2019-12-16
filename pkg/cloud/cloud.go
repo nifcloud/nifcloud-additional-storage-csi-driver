@@ -80,7 +80,13 @@ type Disk struct {
 type DiskOptions struct {
 	CapacityBytes int64
 	VolumeType    string
-	InstanceID    string // temporary instance id to create the volume
+	Zone          string
+}
+
+// Instance represents a NIFCLOUD VM
+type Instance struct {
+	InstanceID       string
+	AvailabilityZone string
 }
 
 // Cloud is interface for cloud api manipulator
@@ -94,6 +100,8 @@ type Cloud interface {
 	GetDiskByName(ctx context.Context, name string, capacityBytes int64) (disk *Disk, err error)
 	GetDiskByID(ctx context.Context, volumeID string) (disk *Disk, err error)
 	IsExistInstance(ctx context.Context, nodeID string) (success bool)
+
+	GetInstanceByName(ctx context.Context, name string) (*Instance, error)
 }
 
 type cloud struct {
@@ -129,10 +137,16 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		return nil, fmt.Errorf("invalid NIFCLOUD VolumeType %q", diskOptions.VolumeType)
 	}
 
-	instanceID := diskOptions.InstanceID
-	if instanceID == "" {
-		return nil, errors.New("InstanceID is required")
+	zone := diskOptions.Zone
+	if zone == "" {
+		return nil, errors.New("Zone is required")
 	}
+
+	instances, err := c.listInstancesByZone(ctx, zone)
+	if err != nil {
+		return nil, err
+	}
+	instanceID := instances[0].InstanceID
 
 	capacity := roundUpCapacity(util.BytesToGiB(diskOptions.CapacityBytes))
 
@@ -154,7 +168,7 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		return nil, fmt.Errorf("volume ID was not returned by CreateVolume")
 	}
 
-	zone := nifcloud.StringValue(resp.AvailabilityZone)
+	createdZone := nifcloud.StringValue(resp.AvailabilityZone)
 	if len(zone) == 0 {
 		return nil, fmt.Errorf("availability zone was not returned by CreateVolume")
 	}
@@ -188,7 +202,7 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 	return &Disk{
 		CapacityGiB:        int64(createdSize),
 		VolumeID:           volumeID,
-		AvailabilityZone:   zone,
+		AvailabilityZone:   createdZone,
 		AttachedInstanceID: "",
 	}, nil
 }
@@ -393,6 +407,18 @@ func (c *cloud) IsExistInstance(ctx context.Context, nodeID string) bool {
 	return true
 }
 
+func (c *cloud) GetInstanceByName(ctx context.Context, name string) (*Instance, error) {
+	res, err := c.getInstance(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("could not found instance %q: %v", name, err)
+	}
+
+	return &Instance{
+		InstanceID:       name,
+		AvailabilityZone: nifcloud.StringValue(res.Placement.AvailabilityZone),
+	}, nil
+}
+
 // waitForVolume waits for volume to be in the "in-use" state.
 func (c *cloud) waitForVolume(ctx context.Context, volumeID, status string) error {
 	var (
@@ -418,6 +444,48 @@ func (c *cloud) waitForVolume(ctx context.Context, volumeID, status string) erro
 	})
 
 	return err
+}
+
+func (c *cloud) listInstancesByZone(ctx context.Context, zone string) ([]Instance, error) {
+	instances, err := c.listInstances(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("there are no instances in %s region", c.region)
+	}
+
+	result := []Instance{}
+	for _, instance := range instances {
+		if instance.AvailabilityZone == zone {
+			result = append(result, instance)
+		}
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("there are no instances in %s zone", zone)
+	}
+
+	return result, nil
+}
+
+func (c *cloud) listInstances(ctx context.Context) ([]Instance, error) {
+	request := c.computing.DescribeInstancesRequest(nil)
+	response, err := request.Send(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error listing NIFCLOUD instances: %v", err)
+	}
+
+	instances := []Instance{}
+	for _, reservation := range response.ReservationSet {
+		instance := reservation.InstancesSet[0]
+		instances = append(instances, Instance{
+			InstanceID:       nifcloud.StringValue(instance.InstanceId),
+			AvailabilityZone: nifcloud.StringValue(instance.Placement.AvailabilityZone),
+		})
+	}
+
+	return instances, nil
 }
 
 func (c *cloud) getInstance(ctx context.Context, nodeID string) (*computing.InstancesSetItem, error) {

@@ -99,11 +99,22 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
+	zone := pickAvailabilityZone(req.GetAccessibilityRequirements())
+	if zone == "" {
+		// use controller running zone as volume creation zone
+		instance, err := d.cloud.GetInstanceByName(ctx, d.instanceID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not detect the zone to create disk: %v", err)
+		}
+		zone = instance.AvailabilityZone
+	}
+	klog.V(1).Infof("create volume in %s zone", zone)
+
 	// create a new volume
 	opts := &cloud.DiskOptions{
 		CapacityBytes: volSizeBytes,
 		VolumeType:    volumeType,
-		InstanceID:    d.instanceID,
+		Zone:          zone,
 	}
 
 	disk, err = d.cloud.CreateDisk(ctx, volName, opts)
@@ -308,6 +319,27 @@ func (d *controllerService) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 func (d *controllerService) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	klog.V(4).Infof("ListSnapshots: called with args %+v", req)
 	return nil, status.Error(codes.Unimplemented, "ListSnapshots is not implemented (NIFCLOUD does not support the snapshot for volume)")
+}
+
+// pickAvailabilityZone selects 1 zone given topology requirement.
+// if not found, empty string is returned.
+func pickAvailabilityZone(requirement *csi.TopologyRequirement) string {
+	if requirement == nil {
+		return ""
+	}
+	for _, topology := range requirement.GetPreferred() {
+		zone, exists := topology.GetSegments()[TopologyKey]
+		if exists {
+			return zone
+		}
+	}
+	for _, topology := range requirement.GetRequisite() {
+		zone, exists := topology.GetSegments()[TopologyKey]
+		if exists {
+			return zone
+		}
+	}
+	return ""
 }
 
 func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
