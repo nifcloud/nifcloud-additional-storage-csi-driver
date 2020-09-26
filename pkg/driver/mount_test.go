@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 )
 
 func Test_newNodeMounter(t *testing.T) {
@@ -55,8 +56,9 @@ func TestNodeMounter_GetDeviceName(t *testing.T) {
 			m := &NodeMounter{
 				mount.SafeFormatAndMount{
 					Interface: fakeMounter,
-					Exec:      mount.NewOsExec(),
+					Exec:      exec.New(),
 				},
+				exec.New(),
 			}
 			got, got1, err := m.GetDeviceName(tt.args.mountPath)
 			if (err != nil) != tt.wantErr {
