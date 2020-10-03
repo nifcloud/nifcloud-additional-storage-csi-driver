@@ -49,10 +49,16 @@ Storage type (See https://pfs.nifcloud.com/service/disk.htm)
 * high-speed-b
 * high-speed (randomly select a or b)
 * flash
+* standard-flash-a
+* standard-flash-b
+* standard-flash (randomly select a or b)
+* high-speed-flash-a
+* high-speed-flash-b
+* high-speed-flash (randomly select a or b)
 
 #### default
 
-high-speed-a
+standard-flash-a
 
 
 ## Installation

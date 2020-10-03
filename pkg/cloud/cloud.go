@@ -19,6 +19,9 @@ import (
 )
 
 const (
+	// Available disk types
+	// doc: https://pfs.nifcloud.com/service/disk.htm
+
 	// VolumeTypeStandard represents a general purpose volume.
 	VolumeTypeStandard = "standard"
 	// VolumeTypeHighSpeed represents a high spped volume (randomly select type A or B)
@@ -29,16 +32,32 @@ const (
 	VolumeTypeHighSpeedB = "high-speed-b"
 	// VolumeTypeFlash represents a flash volume.
 	VolumeTypeFlash = "flash"
+	// VolumeTypeStandardFlash represents a standard flash volume (randomly select type A or B)
+	VolumeTypeStandardFlash = "standard-flash"
+	// VolumeTypeStandardFlashA represents a standard flash volume (only use type A)
+	VolumeTypeStandardFlashA = "standard-flash-a"
+	// VolumeTypeStandardFlashB represents a standard flash volume (only use type B)
+	VolumeTypeStandardFlashB = "standard-flash-b"
+	// VolumeTypeHighSpeedFlash represents a high spped flash volume (randomly select type A or B)
+	VolumeTypeHighSpeedFlash = "high-speed-flash"
+	// VolumeTypeHighSpeedFlashA represents a high spped flash volume (only use type A)
+	VolumeTypeHighSpeedFlashA = "high-speed-flash-a"
+	// VolumeTypeHighSpeedFlashB represents a high spped flash volume (only use type B)
+	VolumeTypeHighSpeedFlashB = "high-speed-flash-b"
 )
 
 var (
 	// VolumeTypeMapping converts the volume identifier from volume type.
 	// More info: https://pfs.nifcloud.com/api/rest/CreateVolume.htm
 	VolumeTypeMapping = map[string]computing.DiskTypeOfCreateVolumeRequest{
-		VolumeTypeStandard:   computing.DiskTypeOfCreateVolumeRequest2,
-		VolumeTypeHighSpeedA: computing.DiskTypeOfCreateVolumeRequest3,
-		VolumeTypeHighSpeedB: computing.DiskTypeOfCreateVolumeRequest4,
-		VolumeTypeFlash:      computing.DiskTypeOfCreateVolumeRequest5,
+		VolumeTypeStandard:        computing.DiskTypeOfCreateVolumeRequest2,
+		VolumeTypeHighSpeedA:      computing.DiskTypeOfCreateVolumeRequest3,
+		VolumeTypeHighSpeedB:      computing.DiskTypeOfCreateVolumeRequest4,
+		VolumeTypeFlash:           computing.DiskTypeOfCreateVolumeRequest5,
+		VolumeTypeStandardFlashA:  computing.DiskTypeOfCreateVolumeRequest6,
+		VolumeTypeStandardFlashB:  computing.DiskTypeOfCreateVolumeRequest7,
+		VolumeTypeHighSpeedFlashA: computing.DiskTypeOfCreateVolumeRequest8,
+		VolumeTypeHighSpeedFlashB: computing.DiskTypeOfCreateVolumeRequest9,
 	}
 )
 
@@ -46,7 +65,7 @@ const (
 	// DefaultVolumeSize represents the default volume size.
 	DefaultVolumeSize int64 = 100 * util.GiB
 	// DefaultVolumeType specifies which storage to use for newly created volumes.
-	DefaultVolumeType = VolumeTypeHighSpeedA
+	DefaultVolumeType = VolumeTypeStandardFlashA
 )
 
 var (
@@ -126,10 +145,16 @@ func NewCloud() (Cloud, error) {
 func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *DiskOptions) (*Disk, error) {
 	var createType computing.DiskTypeOfCreateVolumeRequest
 	switch diskOptions.VolumeType {
-	case VolumeTypeStandard, VolumeTypeHighSpeedA, VolumeTypeHighSpeedB, VolumeTypeFlash:
+	case VolumeTypeStandard, VolumeTypeHighSpeedA, VolumeTypeHighSpeedB, VolumeTypeFlash, VolumeTypeStandardFlashA, VolumeTypeStandardFlashB, VolumeTypeHighSpeedFlashA, VolumeTypeHighSpeedFlashB:
 		createType = VolumeTypeMapping[diskOptions.VolumeType]
 	case VolumeTypeHighSpeed:
 		types := []string{VolumeTypeHighSpeedA, VolumeTypeHighSpeedB}
+		createType = VolumeTypeMapping[types[rand.Intn(len(types))]]
+	case VolumeTypeStandardFlash:
+		types := []string{VolumeTypeStandardFlashA, VolumeTypeStandardFlashB}
+		createType = VolumeTypeMapping[types[rand.Intn(len(types))]]
+	case VolumeTypeHighSpeedFlash:
+		types := []string{VolumeTypeHighSpeedFlashA, VolumeTypeHighSpeedFlashB}
 		createType = VolumeTypeMapping[types[rand.Intn(len(types))]]
 	case "":
 		createType = VolumeTypeMapping[DefaultVolumeType]
