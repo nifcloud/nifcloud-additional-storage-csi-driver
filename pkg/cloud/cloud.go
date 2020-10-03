@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aokumasan/nifcloud-sdk-go-v2/nifcloud"
-	"github.com/aokumasan/nifcloud-sdk-go-v2/service/computing"
 	"github.com/aws/aws-sdk-go-v2/aws/awserr"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
+	"github.com/nifcloud/nifcloud-sdk-go/nifcloud"
+	"github.com/nifcloud/nifcloud-sdk-go/service/computing"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
@@ -34,11 +34,11 @@ const (
 var (
 	// VolumeTypeMapping converts the volume identifier from volume type.
 	// More info: https://pfs.nifcloud.com/api/rest/CreateVolume.htm
-	VolumeTypeMapping = map[string]string{
-		VolumeTypeStandard:   "2",
-		VolumeTypeHighSpeedA: "3",
-		VolumeTypeHighSpeedB: "4",
-		VolumeTypeFlash:      "5",
+	VolumeTypeMapping = map[string]computing.DiskTypeOfCreateVolumeRequest{
+		VolumeTypeStandard:   computing.DiskTypeOfCreateVolumeRequest2,
+		VolumeTypeHighSpeedA: computing.DiskTypeOfCreateVolumeRequest3,
+		VolumeTypeHighSpeedB: computing.DiskTypeOfCreateVolumeRequest4,
+		VolumeTypeFlash:      computing.DiskTypeOfCreateVolumeRequest5,
 	}
 )
 
@@ -124,7 +124,7 @@ func NewCloud() (Cloud, error) {
 }
 
 func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *DiskOptions) (*Disk, error) {
-	var createType string
+	var createType computing.DiskTypeOfCreateVolumeRequest
 	switch diskOptions.VolumeType {
 	case VolumeTypeStandard, VolumeTypeHighSpeedA, VolumeTypeHighSpeedB, VolumeTypeFlash:
 		createType = VolumeTypeMapping[diskOptions.VolumeType]
@@ -151,8 +151,8 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 	capacity := roundUpCapacity(util.BytesToGiB(diskOptions.CapacityBytes))
 
 	req := c.computing.CreateVolumeRequest(&computing.CreateVolumeInput{
-		AccountingType: nifcloud.String("2"), // TODO: set accounting type from diskoptions
-		DiskType:       nifcloud.String(createType),
+		AccountingType: computing.AccountingTypeOfCreateVolumeRequest2, // TODO: set accounting type from diskoptions
+		DiskType:       createType,
 		InstanceId:     nifcloud.String(instanceID),
 		Size:           nifcloud.Int64(capacity),
 		Description:    nifcloud.String(volumeName),
@@ -173,10 +173,7 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		return nil, fmt.Errorf("availability zone was not returned by CreateVolume")
 	}
 
-	createdSize, err := strconv.Atoi(nifcloud.StringValue(resp.Size))
-	if err != nil {
-		return nil, fmt.Errorf("cannot convert disk size %q", nifcloud.StringValue(resp.Size))
-	}
+	createdSize := nifcloud.Int64Value(resp.Size)
 	if createdSize == 0 {
 		return nil, fmt.Errorf("disk size was not returned by CreateVolume")
 	}
@@ -345,7 +342,7 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 		return nil, fmt.Errorf("could not list the volumes: %v", err)
 	}
 
-	var volume *computing.VolumeSetItem
+	var volume *computing.VolumeSet
 	for _, vol := range resp.VolumeSet {
 		if *vol.Description == name {
 			volume = &vol
@@ -488,7 +485,7 @@ func (c *cloud) listInstances(ctx context.Context) ([]Instance, error) {
 	return instances, nil
 }
 
-func (c *cloud) getInstance(ctx context.Context, nodeID string) (*computing.InstancesSetItem, error) {
+func (c *cloud) getInstance(ctx context.Context, nodeID string) (*computing.InstancesSet, error) {
 	request := c.computing.DescribeInstancesRequest(&computing.DescribeInstancesInput{
 		InstanceId: []string{nodeID},
 	})
@@ -497,7 +494,7 @@ func (c *cloud) getInstance(ctx context.Context, nodeID string) (*computing.Inst
 		return nil, fmt.Errorf("error listing NIFCLOUD instances: %v", err)
 	}
 
-	instances := []computing.InstancesSetItem{}
+	instances := []computing.InstancesSet{}
 	for _, reservation := range response.ReservationSet {
 		instances = append(instances, reservation.InstancesSet...)
 	}
@@ -519,11 +516,11 @@ func (c *cloud) getInstance(ctx context.Context, nodeID string) (*computing.Inst
 	return instance, nil
 }
 
-func (c *cloud) setBlockDeviceMapping(ctx context.Context, instance *computing.InstancesSetItem) error {
+func (c *cloud) setBlockDeviceMapping(ctx context.Context, instance *computing.InstancesSet) error {
 	request := c.computing.DescribeInstanceAttributeRequest(
 		&computing.DescribeInstanceAttributeInput{
 			InstanceId: instance.InstanceId,
-			Attribute:  nifcloud.String("blockDeviceMapping"),
+			Attribute:  computing.AttributeOfDescribeInstanceAttributeRequestBlockDeviceMapping,
 		},
 	)
 	response, err := request.Send(ctx)
@@ -531,12 +528,28 @@ func (c *cloud) setBlockDeviceMapping(ctx context.Context, instance *computing.I
 		return fmt.Errorf("error getting block device mapping: %v", err)
 	}
 
-	instance.BlockDeviceMapping = response.DescribeInstanceAttributeOutput.BlockDeviceMapping
+	blockDeviceInfo := response.DescribeInstanceAttributeOutput.BlockDeviceMapping
+	blockDeviceMapping := make([]computing.BlockDeviceMappingOfDescribeInstances, len(blockDeviceInfo))
+	for i, device := range blockDeviceInfo {
+		ebs := &computing.EbsOfDescribeInstances{}
+		if device.Ebs != nil {
+			ebs.AttachTime = device.Ebs.AttachTime
+			ebs.DeleteOnTermination = device.Ebs.DeleteOnTermination
+			ebs.Status = device.Ebs.Status
+			ebs.VolumeId = device.Ebs.VolumeId
+		}
+		blockDeviceMapping[i] = computing.BlockDeviceMappingOfDescribeInstances{
+			DeviceName: device.DeviceName,
+			Ebs:        ebs,
+		}
+	}
+
+	instance.BlockDeviceMapping = blockDeviceMapping
 
 	return nil
 }
 
-func (c *cloud) getVolume(ctx context.Context, input *computing.DescribeVolumesInput) (*computing.VolumeSetItem, error) {
+func (c *cloud) getVolume(ctx context.Context, input *computing.DescribeVolumesInput) (*computing.VolumeSet, error) {
 	response, err := c.computing.DescribeVolumesRequest(input).Send(ctx)
 	if err != nil {
 		return nil, err
@@ -556,7 +569,7 @@ func (c *cloud) getDeviceNameFromVolumeID(ctx context.Context, instanceID, volum
 	request := c.computing.DescribeInstanceAttributeRequest(
 		&computing.DescribeInstanceAttributeInput{
 			InstanceId: nifcloud.String(instanceID),
-			Attribute:  nifcloud.String("blockDeviceMapping"),
+			Attribute:  computing.AttributeOfDescribeInstanceAttributeRequestBlockDeviceMapping,
 		},
 	)
 	response, err := request.Send(ctx)
@@ -603,7 +616,7 @@ func roundUpCapacity(capacityGiB int64) int64 {
 	return (util.RoundUpGiB(capacityGiB)/unit + 1) * unit
 }
 
-func getVolumeAttachedInstanceID(volume *computing.VolumeSetItem) string {
+func getVolumeAttachedInstanceID(volume *computing.VolumeSet) string {
 	var attachedInstanceID string
 	if len(volume.AttachmentSet) == 1 {
 		attachedInstanceID = nifcloud.StringValue(volume.AttachmentSet[0].InstanceId)

@@ -3,13 +3,13 @@ module github.com/aokumasan/nifcloud-additional-storage-csi-driver
 go 1.13
 
 require (
-	github.com/aokumasan/nifcloud-sdk-go-v2 v0.0.4
-	github.com/aws/aws-sdk-go-v2 v0.15.0
+	github.com/aws/aws-sdk-go-v2 v0.24.0
 	github.com/container-storage-interface/spec v1.2.0
 	github.com/kubernetes-sigs/aws-ebs-csi-driver v0.6.0
 	github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver v0.6.0
 	github.com/mattn/go-shellwords v1.0.5
-	github.com/stretchr/testify v1.4.0
+	github.com/nifcloud/nifcloud-sdk-go v1.0.0
+	github.com/stretchr/testify v1.6.1
 	google.golang.org/grpc v1.27.0
 	k8s.io/apimachinery v0.19.2
 	k8s.io/klog v1.0.0
