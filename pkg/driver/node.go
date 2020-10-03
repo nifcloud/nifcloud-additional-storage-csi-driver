@@ -16,8 +16,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/resizefs"
+	"k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 )
 
 const (
@@ -219,7 +220,7 @@ func (n *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 
 	args := []string{"-o", "source", "--noheadings", "--target", req.GetVolumePath()}
-	output, err := n.mounter.Run("findmnt", args...)
+	output, err := n.mounter.Command("findmnt", args...).Output()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not determine device path: %v", err)
 	}
@@ -231,7 +232,7 @@ func (n *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
 		Interface: mount.New(""),
-		Exec:      mount.NewOsExec(),
+		Exec:      exec.New(),
 	})
 
 	if _, err := r.Resize(devicePath, req.GetVolumePath()); err != nil {
