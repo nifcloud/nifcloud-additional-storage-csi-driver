@@ -114,12 +114,12 @@ type Cloud interface {
 	DeleteDisk(ctx context.Context, volumeID string) (success bool, err error)
 	AttachDisk(ctx context.Context, volumeID string, nodeID string) (devicePath string, err error)
 	DetachDisk(ctx context.Context, volumeID string, nodeID string) (err error)
+	ResizeDisk(ctx context.Context, volumeID string, size int64) (newSize int64, err error)
 	ListDisks(ctx context.Context) (disks []*Disk, err error)
 	WaitForAttachmentState(ctx context.Context, volumeID, state string) error
 	GetDiskByName(ctx context.Context, name string, capacityBytes int64) (disk *Disk, err error)
 	GetDiskByID(ctx context.Context, volumeID string) (disk *Disk, err error)
 	IsExistInstance(ctx context.Context, nodeID string) (success bool)
-
 	GetInstanceByName(ctx context.Context, name string) (*Instance, error)
 }
 
@@ -289,6 +289,59 @@ func (c *cloud) DetachDisk(ctx context.Context, volumeID, nodeID string) error {
 	}
 
 	return nil
+}
+
+func (c *cloud) ResizeDisk(ctx context.Context, volumeID string, size int64) (int64, error) {
+	volume, err := c.GetDiskByID(ctx, volumeID)
+	if err != nil {
+		return 0, err
+	}
+
+	currentSize := volume.CapacityGiB
+	desiredSize := roundUpCapacity(util.BytesToGiB(size))
+	if desiredSize-currentSize < 0 {
+		return 0, fmt.Errorf(
+			"could not resize %s's size to %d because it is smaller than current size %d",
+			volumeID, desiredSize, currentSize,
+		)
+	} else if currentSize > desiredSize {
+		// no need to resize.
+		return currentSize, nil
+	}
+
+	// NIFCLOUD ExtendVolumeSize API can only grow in size by 100GiB
+	// so, it loops until volume size reached the target size.
+	for {
+		request := c.computing.ExtendVolumeSizeRequest(&computing.ExtendVolumeSizeInput{
+			NiftyReboot: computing.NiftyRebootOfExtendVolumeSizeRequestFalse,
+			VolumeId:    nifcloud.String(volumeID),
+		})
+		if _, err := request.Send(ctx); err != nil {
+			klog.Errorf("ExtendVolumeSize returns an error: %v", err)
+			return 0, err
+		}
+
+		// wait for resized. after call ExtendVolumeSize API,
+		// it returns resizing status in volumeSet.items[].attachmentSet.item[].status
+		// (attaching: resizing -> attached: resize succeeded)
+		if err := c.WaitForAttachmentState(ctx, volumeID, "attached"); err != nil {
+			return 0, err
+		}
+
+		volume, err = c.GetDiskByID(ctx, volumeID)
+		if err != nil {
+			klog.Errorf("could not get the disk info from id: %v", err)
+			return 0, err
+		}
+		klog.V(4).Infof("after extend volume: current=%dGiB, desired=%dGiB", volume.CapacityGiB, desiredSize)
+		if volume.CapacityGiB >= desiredSize {
+			break
+		}
+	}
+
+	klog.V(4).Infof("resize succeeded! current volume size is %dGiB", volume.CapacityGiB)
+
+	return volume.CapacityGiB, nil
 }
 
 func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
@@ -638,7 +691,7 @@ func roundUpCapacity(capacityGiB int64) int64 {
 	if capacityGiB%unit == 0 {
 		return capacityGiB
 	}
-	return (util.RoundUpGiB(capacityGiB)/unit + 1) * unit
+	return (capacityGiB/unit + 1) * unit
 }
 
 func getVolumeAttachedInstanceID(volume *computing.VolumeSet) string {
