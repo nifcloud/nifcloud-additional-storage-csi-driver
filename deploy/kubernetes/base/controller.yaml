@@ -42,6 +42,8 @@ spec:
                 secretKeyRef:
                   name: nifcloud-secret
                   key: secret_access_key
+            - name: NIFCLOUD_INSTANCE_ID
+              value: ""
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
