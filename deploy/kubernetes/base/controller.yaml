@@ -84,6 +84,19 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-resizer
+          image: quay.io/k8scsi/csi-resizer:v1.0.0
+          args:
+            - --csi-address=$(ADDRESS)
+            - --v=5
+            - --leader-election
+            - --timeout=60s
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: liveness-probe
           image: quay.io/k8scsi/livenessprobe:v1.1.0
           args:

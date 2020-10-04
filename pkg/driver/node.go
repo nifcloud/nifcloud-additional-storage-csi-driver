@@ -230,6 +230,10 @@ func (n *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Errorf(codes.Internal, "Could not get valid device for mount path: %q", req.GetVolumePath())
 	}
 
+	if err := n.rescanStorageDevice(devicePath); err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not rescan the device of %s: %v", devicePath, err)
+	}
+
 	r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
 		Interface: mount.New(""),
 		Exec:      exec.New(),
@@ -532,7 +536,7 @@ func (n *nodeService) scanStorageDevices() error {
 // removeStorageDevice online detach the specified storage
 // More info: https://pfs.nifcloud.com/guide/cp/login/detach_linux.htm
 func (n *nodeService) removeStorageDevice(dev string) error {
-	removeDevicePath := "/sys/block/" + dev + "/device/delete"
+	removeDevicePath := filepath.Join("/sys/block/", filepath.Base(dev), "/device/delete")
 	if _, err := os.Stat(removeDevicePath); err != nil {
 		// If the path does not exist, assume it is removed from this node
 		return nil
@@ -546,6 +550,27 @@ func (n *nodeService) removeStorageDevice(dev string) error {
 
 	_, err = fmt.Fprint(f, "1")
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// rescanStorageDevice online rescan the specified storage
+// More info: https://pfs.nifcloud.com/guide/cp/login/extend_partition_linux.htm
+func (n *nodeService) rescanStorageDevice(dev string) error {
+	rescanDevicePath := filepath.Join("/sys/block/", filepath.Base(dev), "/device/rescan")
+	if _, err := os.Stat(rescanDevicePath); err != nil {
+		return fmt.Errorf("Target device %q not found in /sys/block: %w", dev, err)
+	}
+
+	f, err := os.OpenFile(rescanDevicePath, os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := fmt.Fprint(f, "1"); err != nil {
 		return err
 	}
 
