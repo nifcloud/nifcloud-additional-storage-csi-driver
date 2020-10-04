@@ -26,6 +26,7 @@ var (
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	}
 )
 
@@ -303,7 +304,31 @@ func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req 
 
 func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	klog.V(4).Infof("ControllerExpandVolume: called with args %+v", *req)
-	return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume is not implemented (NIFCLOUD does not support the expand volume)")
+	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
+	}
+
+	capRange := req.GetCapacityRange()
+	if capRange == nil {
+		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
+	}
+
+	newSize := util.RoundUpBytes(capRange.GetRequiredBytes())
+	maxVolSize := capRange.GetLimitBytes()
+	if maxVolSize > 0 && maxVolSize < newSize {
+		return nil, status.Error(codes.InvalidArgument, "After round-up, volume size exceeds the limit specified")
+	}
+
+	actualSizeGiB, err := d.cloud.ResizeDisk(ctx, volumeID, newSize)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not resize volume %q: %v", volumeID, err)
+	}
+
+	return &csi.ControllerExpandVolumeResponse{
+		CapacityBytes:         util.GiBToBytes(actualSizeGiB),
+		NodeExpansionRequired: true,
+	}, nil
 }
 
 func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
