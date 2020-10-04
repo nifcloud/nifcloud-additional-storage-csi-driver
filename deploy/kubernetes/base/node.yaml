@@ -34,6 +34,8 @@ spec:
               value: unix:/csi/csi.sock
             - name: NIFCLOUD_ZONE
               value: east-11
+            - name: NIFCLOUD_INSTANCE_ID
+              value: ""
           volumeMounts:
             - name: kubelet-dir
               mountPath: /var/lib/kubelet
