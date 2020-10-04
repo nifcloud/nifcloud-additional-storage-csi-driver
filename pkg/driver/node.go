@@ -536,7 +536,7 @@ func (n *nodeService) scanStorageDevices() error {
 // removeStorageDevice online detach the specified storage
 // More info: https://pfs.nifcloud.com/guide/cp/login/detach_linux.htm
 func (n *nodeService) removeStorageDevice(dev string) error {
-	removeDevicePath := "/sys/block/" + dev + "/device/delete"
+	removeDevicePath := filepath.Join("/sys/block/", filepath.Base(dev), "/device/delete")
 	if _, err := os.Stat(removeDevicePath); err != nil {
 		// If the path does not exist, assume it is removed from this node
 		return nil
