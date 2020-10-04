@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -41,7 +42,7 @@ type DriverOptions struct {
 func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
 	klog.Infof("Driver: %v Version: %v", DriverName, driverVersion)
 
-	instanceID, err := getInstanceIDFromGuestInfo()
+	instanceID, err := getInstanceID()
 	if err != nil {
 		panic(err)
 	}
@@ -106,6 +107,15 @@ func WithEndpoint(endpoint string) func(*DriverOptions) {
 	return func(o *DriverOptions) {
 		o.endpoint = endpoint
 	}
+}
+
+func getInstanceID() (string, error) {
+	instanceID := os.Getenv("NIFCLOUD_INSTANCE_ID")
+	if instanceID != "" {
+		return instanceID, nil
+	}
+
+	return getInstanceIDFromGuestInfo()
 }
 
 func getInstanceIDFromGuestInfo() (string, error) {
