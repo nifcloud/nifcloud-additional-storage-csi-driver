@@ -9,6 +9,7 @@ require (
 	github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver v0.6.0
 	github.com/nifcloud/nifcloud-sdk-go v1.21.0
 	github.com/stretchr/testify v1.8.1
+	golang.org/x/sys v0.4.0
 	google.golang.org/grpc v1.27.0
 	k8s.io/apimachinery v0.19.2
 	k8s.io/klog v1.0.0
@@ -23,6 +24,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.17.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logr/logr v0.2.0 // indirect
+	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
@@ -31,12 +33,12 @@ require (
 	go.opencensus.io v0.22.2 // indirect
 	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
-	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/text v0.6.0 // indirect
 	google.golang.org/api v0.15.1 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
+	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.2.0 // indirect
 )

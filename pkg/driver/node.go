@@ -7,14 +7,17 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	awsdriver "github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/driver"
 	gcpcommon "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pkg/common"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/resizefs"
 	"k8s.io/utils/exec"
@@ -323,7 +326,64 @@ func (n *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (n *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented yet")
+	klog.V(4).Infof("NodeGetVolumeStats: called with args %+v", *req)
+	if len(req.VolumeId) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats volume ID was empty")
+	}
+	if len(req.VolumePath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats volume path was empty")
+	}
+
+	exists, err := n.mounter.ExistsPath(req.VolumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "unknown error when stat on %s: %v", req.VolumePath, err)
+	}
+	if !exists {
+		return nil, status.Errorf(codes.NotFound, "path %s does not exist", req.VolumePath)
+	}
+
+	isBlock, err := isBlockDevice(req.VolumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to determine whether %s is block device: %v", req.VolumePath, err)
+	}
+
+	if isBlock {
+		bcap, err := n.getBlockSizeBytes(req.VolumePath)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get block capacity on path %s: %v", req.VolumePath, err)
+		}
+
+		return &csi.NodeGetVolumeStatsResponse{
+			Usage: []*csi.VolumeUsage{
+				{
+					Unit:  csi.VolumeUsage_BYTES,
+					Total: bcap,
+				},
+			},
+		}, nil
+	}
+
+	available, capacity, used, inodes, inodesFree, inodesUsed, err := getFsInfo(req.VolumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get FsInfo due to error: %v", err)
+	}
+
+	return &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Unit:      csi.VolumeUsage_BYTES,
+				Available: resource.NewQuantity(available, resource.BinarySI).AsDec().UnscaledBig().Int64(),
+				Total:     resource.NewQuantity(capacity, resource.BinarySI).AsDec().UnscaledBig().Int64(),
+				Used:      resource.NewQuantity(used, resource.BinarySI).AsDec().UnscaledBig().Int64(),
+			},
+			{
+				Unit:      csi.VolumeUsage_INODES,
+				Available: resource.NewQuantity(inodesFree, resource.BinarySI).AsDec().UnscaledBig().Int64(),
+				Total:     resource.NewQuantity(inodes, resource.BinarySI).AsDec().UnscaledBig().Int64(),
+				Used:      resource.NewQuantity(inodesUsed, resource.BinarySI).AsDec().UnscaledBig().Int64(),
+			},
+		},
+	}, nil
 }
 
 func (n *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
@@ -454,6 +514,22 @@ func (n *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeR
 	return nil
 }
 
+func (n *nodeService) getBlockSizeBytes(devicePath string) (int64, error) {
+	cmd := n.mounter.(*NodeMounter).Exec.Command("blockdev", "--getsize64", devicePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return -1, fmt.Errorf("error when getting size of block volume at path %s: output: %s, err: %v", devicePath, string(output), err)
+	}
+
+	strOut := strings.TrimSpace(string(output))
+	gotSizeBytes, err := strconv.ParseInt(strOut, 10, 64)
+	if err != nil {
+		return -1, fmt.Errorf("failed to parse size %s as int", strOut)
+	}
+
+	return gotSizeBytes, nil
+}
+
 func (n *nodeService) findDevicePath(scsiID string) (string, error) {
 	if !strings.HasPrefix(scsiID, "SCSI") {
 		return "", fmt.Errorf("invalid SCSI ID %q was specified. SCSI ID must be start with SCSI (0:?)", scsiID)
@@ -575,4 +651,37 @@ func (n *nodeService) rescanStorageDevice(dev string) error {
 	}
 
 	return nil
+}
+
+func getFsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
+	if err != nil {
+		return 0, 0, 0, 0, 0, 0, err
+	}
+
+	// Available is blocks available * fragment size
+	available := int64(statfs.Bavail) * int64(statfs.Bsize)
+
+	// Capacity is total block count * fragment size
+	capacity := int64(statfs.Blocks) * int64(statfs.Bsize)
+
+	// Usage is block being used * fragment size (aka block size).
+	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+
+	inodes := int64(statfs.Files)
+	inodesFree := int64(statfs.Ffree)
+	inodesUsed := inodes - inodesFree
+
+	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
+}
+
+func isBlockDevice(fullPath string) (bool, error) {
+	var st unix.Stat_t
+	err := unix.Stat(fullPath, &st)
+	if err != nil {
+		return false, err
+	}
+
+	return (st.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
