@@ -7,6 +7,6 @@ RUN make build
 
 FROM alpine:3.10.3
 
-RUN apk add --no-cache open-vm-tools util-linux e2fsprogs xfsprogs blkid e2fsprogs-extra xfsprogs-extra
+RUN apk add --no-cache util-linux e2fsprogs xfsprogs blkid e2fsprogs-extra xfsprogs-extra
 COPY --from=builder /go/src/github.com/aokumasan/nifcloud-additional-storage-csi-driver/bin/nifcloud-additional-storage-csi-driver /bin/nifcloud-additional-storage-csi-driver
 ENTRYPOINT ["/bin/nifcloud-additional-storage-csi-driver"]

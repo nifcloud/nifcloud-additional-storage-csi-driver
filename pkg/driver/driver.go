@@ -6,11 +6,9 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
-	"github.com/mattn/go-shellwords"
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 )
@@ -110,24 +108,10 @@ func WithEndpoint(endpoint string) func(*DriverOptions) {
 }
 
 func getInstanceID() (string, error) {
-	instanceID := os.Getenv("NIFCLOUD_INSTANCE_ID")
-	if instanceID != "" {
-		return instanceID, nil
+	instanceID := os.Getenv("NODE_NAME")
+	if instanceID == "" {
+		return "", fmt.Errorf("the environment variable 'NODE_NAME' must not be empty")
 	}
 
-	return getInstanceIDFromGuestInfo()
-}
-
-func getInstanceIDFromGuestInfo() (string, error) {
-	const cmd = "vmtoolsd --cmd 'info-get guestinfo.hostname'"
-	args, err := shellwords.Parse(cmd)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse command %q: %v", cmd, err)
-	}
-	out, err := execCommand(args[0], args[1:]...).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("could not get instance id from vmtoolsd: %v (%v)", string(out), err)
-	}
-
-	return strings.TrimSpace(string(out)), nil
+	return instanceID, nil
 }
