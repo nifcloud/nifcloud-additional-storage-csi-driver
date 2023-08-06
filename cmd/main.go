@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/driver"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func init() {
