@@ -1,4 +1,4 @@
-FROM golang:1.13.3-alpine as builder
+FROM golang:1.20.7-alpine as builder
 
 WORKDIR /go/src/github.com/aokumasan/nifcloud-additional-storage-csi-driver
 RUN apk add --no-cache make git
