@@ -1,6 +1,6 @@
 module github.com/aokumasan/nifcloud-additional-storage-csi-driver
 
-go 1.13
+go 1.20
 
 require (
 	github.com/aws/aws-sdk-go-v2 v0.24.0
@@ -15,6 +15,30 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.17.3
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+)
+
+require (
+	cloud.google.com/go v0.51.0 // indirect
+	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317 // indirect
+	github.com/aws/aws-sdk-go v1.29.11 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-logr/logr v0.2.0 // indirect
+	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
+	github.com/golang/protobuf v1.4.2 // indirect
+	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
+	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	go.opencensus.io v0.22.2 // indirect
+	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
+	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
+	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4 // indirect
+	golang.org/x/text v0.3.3 // indirect
+	google.golang.org/api v0.15.1 // indirect
+	google.golang.org/appengine v1.6.5 // indirect
+	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
+	google.golang.org/protobuf v1.24.0 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
+	k8s.io/klog/v2 v2.2.0 // indirect
 )
 
 replace (
