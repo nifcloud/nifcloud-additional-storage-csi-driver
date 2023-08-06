@@ -24,7 +24,7 @@ spec:
       containers:
         - name: nifcloud-storage-driver
           image: aokumasan/nifcloud-additional-storage-csi-driver:latest
-          args :
+          args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
           env:
@@ -42,8 +42,10 @@ spec:
                 secretKeyRef:
                   name: nifcloud-secret
                   key: secret_access_key
-            - name: NIFCLOUD_INSTANCE_ID
-              value: ""
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
