@@ -5,7 +5,7 @@ RUN apk add --no-cache make git
 ADD . .
 RUN make build
 
-FROM alpine:3.10.3
+FROM alpine:3.18.2
 
 RUN apk add --no-cache util-linux e2fsprogs xfsprogs blkid e2fsprogs-extra xfsprogs-extra
 COPY --from=builder /go/src/github.com/aokumasan/nifcloud-additional-storage-csi-driver/bin/nifcloud-additional-storage-csi-driver /bin/nifcloud-additional-storage-csi-driver
