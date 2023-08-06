@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws/awserr"
+	"github.com/aws/smithy-go"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
 	"github.com/nifcloud/nifcloud-sdk-go/nifcloud"
 	"github.com/nifcloud/nifcloud-sdk-go/service/computing"
+	"github.com/nifcloud/nifcloud-sdk-go/service/computing/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 )
@@ -49,15 +50,15 @@ const (
 var (
 	// VolumeTypeMapping converts the volume identifier from volume type.
 	// More info: https://pfs.nifcloud.com/api/rest/CreateVolume.htm
-	VolumeTypeMapping = map[string]computing.DiskTypeOfCreateVolumeRequest{
-		VolumeTypeStandard:        computing.DiskTypeOfCreateVolumeRequest2,
-		VolumeTypeHighSpeedA:      computing.DiskTypeOfCreateVolumeRequest3,
-		VolumeTypeHighSpeedB:      computing.DiskTypeOfCreateVolumeRequest4,
-		VolumeTypeFlash:           computing.DiskTypeOfCreateVolumeRequest5,
-		VolumeTypeStandardFlashA:  computing.DiskTypeOfCreateVolumeRequest6,
-		VolumeTypeStandardFlashB:  computing.DiskTypeOfCreateVolumeRequest7,
-		VolumeTypeHighSpeedFlashA: computing.DiskTypeOfCreateVolumeRequest8,
-		VolumeTypeHighSpeedFlashB: computing.DiskTypeOfCreateVolumeRequest9,
+	VolumeTypeMapping = map[string]types.DiskTypeOfCreateVolumeRequest{
+		VolumeTypeStandard:        types.DiskTypeOfCreateVolumeRequestStandardStorage,
+		VolumeTypeHighSpeedA:      types.DiskTypeOfCreateVolumeRequestHighSpeedStorageA,
+		VolumeTypeHighSpeedB:      types.DiskTypeOfCreateVolumeRequestHighSpeedStorageB,
+		VolumeTypeFlash:           types.DiskTypeOfCreateVolumeRequestFlashDrive,
+		VolumeTypeStandardFlashA:  types.DiskTypeOfCreateVolumeRequestStandardFlashStorageA,
+		VolumeTypeStandardFlashB:  types.DiskTypeOfCreateVolumeRequestStandardFlashStorageB,
+		VolumeTypeHighSpeedFlashA: types.DiskTypeOfCreateVolumeRequestHighSpeedFlashStorageA,
+		VolumeTypeHighSpeedFlashB: types.DiskTypeOfCreateVolumeRequestHighSpeedFlashStorageB,
 	}
 )
 
@@ -138,12 +139,12 @@ func NewCloud() (Cloud, error) {
 	cfg := nifcloud.NewConfig(accessKeyID, secretAccessKey, region)
 	return &cloud{
 		region:    region,
-		computing: computing.New(cfg),
+		computing: computing.NewFromConfig(cfg),
 	}, nil
 }
 
 func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *DiskOptions) (*Disk, error) {
-	var createType computing.DiskTypeOfCreateVolumeRequest
+	var createType types.DiskTypeOfCreateVolumeRequest
 	switch diskOptions.VolumeType {
 	case VolumeTypeStandard, VolumeTypeHighSpeedA, VolumeTypeHighSpeedB, VolumeTypeFlash, VolumeTypeStandardFlashA, VolumeTypeStandardFlashB, VolumeTypeHighSpeedFlashA, VolumeTypeHighSpeedFlashB:
 		createType = VolumeTypeMapping[diskOptions.VolumeType]
@@ -175,30 +176,29 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 
 	capacity := roundUpCapacity(util.BytesToGiB(diskOptions.CapacityBytes))
 
-	req := c.computing.CreateVolumeRequest(&computing.CreateVolumeInput{
-		AccountingType: computing.AccountingTypeOfCreateVolumeRequest2, // TODO: set accounting type from diskoptions
+	input := &computing.CreateVolumeInput{
+		AccountingType: types.AccountingTypeOfCreateVolumeRequestHourly, // TODO: set accounting type from diskoptions
 		DiskType:       createType,
 		InstanceId:     nifcloud.String(instanceID),
-		Size:           nifcloud.Int64(capacity),
+		Size:           nifcloud.Int32(int32(capacity)),
 		Description:    nifcloud.String(volumeName),
-	})
-
-	resp, err := req.Send(ctx)
+	}
+	resp, err := c.computing.CreateVolume(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("could not create NIFCLOUD additional storage: %v", err)
 	}
 
-	volumeID := nifcloud.StringValue(resp.VolumeId)
+	volumeID := nifcloud.ToString(resp.VolumeId)
 	if len(volumeID) == 0 {
 		return nil, fmt.Errorf("volume ID was not returned by CreateVolume")
 	}
 
-	createdZone := nifcloud.StringValue(resp.AvailabilityZone)
+	createdZone := nifcloud.ToString(resp.AvailabilityZone)
 	if len(zone) == 0 {
 		return nil, fmt.Errorf("availability zone was not returned by CreateVolume")
 	}
 
-	createdSize := nifcloud.Int64Value(resp.Size)
+	createdSize := nifcloud.ToInt32(resp.Size)
 	if createdSize == 0 {
 		return nil, fmt.Errorf("disk size was not returned by CreateVolume")
 	}
@@ -207,13 +207,12 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		return nil, fmt.Errorf("failed to get an in-use volume: %v", err)
 	}
 
-	detachVolumeRequest := c.computing.DetachVolumeRequest(&computing.DetachVolumeInput{
+	detachVolumeInput := &computing.DetachVolumeInput{
 		Agreement:  nifcloud.Bool(true),
 		InstanceId: nifcloud.String(instanceID),
 		VolumeId:   nifcloud.String(volumeID),
-	})
-	_, err = detachVolumeRequest.Send(ctx)
-	if err != nil {
+	}
+	if _, err = c.computing.DetachVolume(ctx, detachVolumeInput); err != nil {
 		return nil, fmt.Errorf("could not detach additional storage %q from %q: %v", volumeID, instanceID, err)
 	}
 
@@ -230,28 +229,28 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 }
 
 func (c *cloud) DeleteDisk(ctx context.Context, volumeID string) (bool, error) {
-	req := c.computing.DeleteVolumeRequest(&computing.DeleteVolumeInput{VolumeId: nifcloud.String(volumeID)})
-	if _, err := req.Send(ctx); err != nil {
+	input := &computing.DeleteVolumeInput{
+		VolumeId: nifcloud.String(volumeID),
+	}
+	if _, err := c.computing.DeleteVolume(ctx, input); err != nil {
 		if isAWSErrorVolumeNotFound(err) {
 			return false, ErrNotFound
 		}
 		return false, fmt.Errorf("DeleteDisk could not delete volume: %v", err)
 	}
+
 	return true, nil
 }
 
 func (c *cloud) AttachDisk(ctx context.Context, volumeID, nodeID string) (string, error) {
-	resp, err := c.computing.AttachVolumeRequest(
-		&computing.AttachVolumeInput{
-			InstanceId: nifcloud.String(nodeID),
-			VolumeId:   nifcloud.String(volumeID),
-		},
-	).Send(ctx)
+	input := &computing.AttachVolumeInput{
+		InstanceId: nifcloud.String(nodeID),
+		VolumeId:   nifcloud.String(volumeID),
+	}
+	resp, err := c.computing.AttachVolume(ctx, input)
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			if awsErr.Code() == "Server.Inoperable.Volume.AlreadyAttached" {
-				return "", ErrAlreadyExists
-			}
+		if isAWSError(err, "Server.Inoperable.Volume.AlreadyAttached") {
+			return "", ErrAlreadyExists
 		}
 		return "", fmt.Errorf("could not attach volume %q to node %q: %v", volumeID, nodeID, err)
 	}
@@ -275,12 +274,12 @@ func (c *cloud) AttachDisk(ctx context.Context, volumeID, nodeID string) (string
 }
 
 func (c *cloud) DetachDisk(ctx context.Context, volumeID, nodeID string) error {
-	_, err := c.computing.DetachVolumeRequest(&computing.DetachVolumeInput{
+	input := &computing.DetachVolumeInput{
 		InstanceId: nifcloud.String(nodeID),
 		VolumeId:   nifcloud.String(volumeID),
 		Agreement:  nifcloud.Bool(true),
-	}).Send(ctx)
-	if err != nil {
+	}
+	if _, err := c.computing.DetachVolume(ctx, input); err != nil {
 		return fmt.Errorf("could not detach volume %q from node %q: %v", volumeID, nodeID, err)
 	}
 
@@ -312,11 +311,11 @@ func (c *cloud) ResizeDisk(ctx context.Context, volumeID string, size int64) (in
 	// NIFCLOUD ExtendVolumeSize API can only grow in size by 100GiB
 	// so, it loops until volume size reached the target size.
 	for {
-		request := c.computing.ExtendVolumeSizeRequest(&computing.ExtendVolumeSizeInput{
-			NiftyReboot: computing.NiftyRebootOfExtendVolumeSizeRequestFalse,
+		input := &computing.ExtendVolumeSizeInput{
+			NiftyReboot: types.NiftyRebootOfExtendVolumeSizeRequestFalse,
 			VolumeId:    nifcloud.String(volumeID),
-		})
-		if _, err := request.Send(ctx); err != nil {
+		}
+		if _, err := c.computing.ExtendVolumeSize(ctx, input); err != nil {
 			klog.Errorf("ExtendVolumeSize returns an error: %v", err)
 			return 0, err
 		}
@@ -345,30 +344,29 @@ func (c *cloud) ResizeDisk(ctx context.Context, volumeID string, size int64) (in
 }
 
 func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
-	request := c.computing.DescribeVolumesRequest(nil)
-	response, err := request.Send(ctx)
+	resp, err := c.computing.DescribeVolumes(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("clould not fetch the additional storages: %v", err)
 	}
 
 	disks := []*Disk{}
-	for _, volume := range response.DescribeVolumesOutput.VolumeSet {
+	for _, volume := range resp.VolumeSet {
 		// Volume name was setted in volume description.
 		// So use description to check this volume was created by Kubernetes CSI driver.
-		if !strings.HasPrefix(nifcloud.StringValue(volume.Description), "pvc-") {
+		if !strings.HasPrefix(nifcloud.ToString(volume.Description), "pvc-") {
 			continue
 		}
 
-		volSize, err := strconv.Atoi(nifcloud.StringValue(volume.Size))
+		volSize, err := strconv.Atoi(nifcloud.ToString(volume.Size))
 		if err != nil {
-			klog.Warningf("could not convert volume size %q. using 100GiB...: %v", nifcloud.StringValue(volume.Size), err)
+			klog.Warningf("could not convert volume size %q. using 100GiB...: %v", nifcloud.ToString(volume.Size), err)
 			volSize = 100
 		}
 
 		disks = append(disks, &Disk{
-			VolumeID:           nifcloud.StringValue(volume.VolumeId),
+			VolumeID:           nifcloud.ToString(volume.VolumeId),
 			CapacityGiB:        int64(volSize),
-			AvailabilityZone:   nifcloud.StringValue(volume.AvailabilityZone),
+			AvailabilityZone:   nifcloud.ToString(volume.AvailabilityZone),
 			AttachedInstanceID: getVolumeAttachedInstanceID(&volume),
 		})
 	}
@@ -415,14 +413,14 @@ func (c *cloud) WaitForAttachmentState(ctx context.Context, volumeID, state stri
 }
 
 func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes int64) (*Disk, error) {
-	resp, err := c.computing.DescribeVolumesRequest(nil).Send(ctx)
+	resp, err := c.computing.DescribeVolumes(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not list the volumes: %v", err)
 	}
 
-	var volume *computing.VolumeSet
+	var volume *types.VolumeSet
 	for _, vol := range resp.VolumeSet {
-		if *vol.Description == name {
+		if nifcloud.ToString(vol.Description) == name {
 			volume = &vol
 		}
 	}
@@ -430,9 +428,9 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 		return nil, ErrNotFound
 	}
 
-	volSizeGiB, err := strconv.Atoi(nifcloud.StringValue(volume.Size))
+	volSizeGiB, err := strconv.Atoi(nifcloud.ToString(volume.Size))
 	if err != nil {
-		return nil, fmt.Errorf("could not convert volume size %q: %v", nifcloud.StringValue(volume.Size), err)
+		return nil, fmt.Errorf("could not convert volume size %q: %v", nifcloud.ToString(volume.Size), err)
 	}
 
 	if int64(volSizeGiB) != roundUpCapacity(util.BytesToGiB(capacityBytes)) {
@@ -444,9 +442,9 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 	}
 
 	return &Disk{
-		VolumeID:           nifcloud.StringValue(volume.VolumeId),
+		VolumeID:           nifcloud.ToString(volume.VolumeId),
 		CapacityGiB:        int64(volSizeGiB),
-		AvailabilityZone:   nifcloud.StringValue(volume.AvailabilityZone),
+		AvailabilityZone:   nifcloud.ToString(volume.AvailabilityZone),
 		AttachedInstanceID: getVolumeAttachedInstanceID(volume),
 	}, nil
 }
@@ -455,21 +453,20 @@ func (c *cloud) GetDiskByID(ctx context.Context, volumeID string) (*Disk, error)
 	input := &computing.DescribeVolumesInput{
 		VolumeId: []string{volumeID},
 	}
-
 	volume, err := c.getVolume(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
-	volSize, err := strconv.Atoi(nifcloud.StringValue(volume.Size))
+	volSize, err := strconv.Atoi(nifcloud.ToString(volume.Size))
 	if err != nil {
-		return nil, fmt.Errorf("could not convert volume size %q: %v", nifcloud.StringValue(volume.Size), err)
+		return nil, fmt.Errorf("could not convert volume size %q: %v", nifcloud.ToString(volume.Size), err)
 	}
 
 	return &Disk{
-		VolumeID:           nifcloud.StringValue(volume.VolumeId),
+		VolumeID:           nifcloud.ToString(volume.VolumeId),
 		CapacityGiB:        int64(volSize),
-		AvailabilityZone:   nifcloud.StringValue(volume.AvailabilityZone),
+		AvailabilityZone:   nifcloud.ToString(volume.AvailabilityZone),
 		AttachedInstanceID: getVolumeAttachedInstanceID(volume),
 	}, nil
 }
@@ -490,7 +487,7 @@ func (c *cloud) GetInstanceByName(ctx context.Context, name string) (*Instance, 
 
 	return &Instance{
 		InstanceID:       name,
-		AvailabilityZone: nifcloud.StringValue(res.Placement.AvailabilityZone),
+		AvailabilityZone: nifcloud.ToString(res.Placement.AvailabilityZone),
 	}, nil
 }
 
@@ -545,35 +542,34 @@ func (c *cloud) listInstancesByZone(ctx context.Context, zone string) ([]Instanc
 }
 
 func (c *cloud) listInstances(ctx context.Context) ([]Instance, error) {
-	request := c.computing.DescribeInstancesRequest(nil)
-	response, err := request.Send(ctx)
+	resp, err := c.computing.DescribeInstances(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error listing NIFCLOUD instances: %v", err)
 	}
 
 	instances := []Instance{}
-	for _, reservation := range response.ReservationSet {
+	for _, reservation := range resp.ReservationSet {
 		instance := reservation.InstancesSet[0]
 		instances = append(instances, Instance{
-			InstanceID:       nifcloud.StringValue(instance.InstanceId),
-			AvailabilityZone: nifcloud.StringValue(instance.Placement.AvailabilityZone),
+			InstanceID:       nifcloud.ToString(instance.InstanceId),
+			AvailabilityZone: nifcloud.ToString(instance.Placement.AvailabilityZone),
 		})
 	}
 
 	return instances, nil
 }
 
-func (c *cloud) getInstance(ctx context.Context, nodeID string) (*computing.InstancesSet, error) {
-	request := c.computing.DescribeInstancesRequest(&computing.DescribeInstancesInput{
+func (c *cloud) getInstance(ctx context.Context, nodeID string) (*types.InstancesSet, error) {
+	input := &computing.DescribeInstancesInput{
 		InstanceId: []string{nodeID},
-	})
-	response, err := request.Send(ctx)
+	}
+	resp, err := c.computing.DescribeInstances(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("error listing NIFCLOUD instances: %v", err)
 	}
 
-	instances := []computing.InstancesSet{}
-	for _, reservation := range response.ReservationSet {
+	instances := []types.InstancesSet{}
+	for _, reservation := range resp.ReservationSet {
 		instances = append(instances, reservation.InstancesSet...)
 	}
 
@@ -594,29 +590,27 @@ func (c *cloud) getInstance(ctx context.Context, nodeID string) (*computing.Inst
 	return instance, nil
 }
 
-func (c *cloud) setBlockDeviceMapping(ctx context.Context, instance *computing.InstancesSet) error {
-	request := c.computing.DescribeInstanceAttributeRequest(
-		&computing.DescribeInstanceAttributeInput{
-			InstanceId: instance.InstanceId,
-			Attribute:  computing.AttributeOfDescribeInstanceAttributeRequestBlockDeviceMapping,
-		},
-	)
-	response, err := request.Send(ctx)
+func (c *cloud) setBlockDeviceMapping(ctx context.Context, instance *types.InstancesSet) error {
+	input := &computing.DescribeInstanceAttributeInput{
+		InstanceId: instance.InstanceId,
+		Attribute:  types.AttributeOfDescribeInstanceAttributeRequestBlockDeviceMapping,
+	}
+	resp, err := c.computing.DescribeInstanceAttribute(ctx, input)
 	if err != nil {
 		return fmt.Errorf("error getting block device mapping: %v", err)
 	}
 
-	blockDeviceInfo := response.DescribeInstanceAttributeOutput.BlockDeviceMapping
-	blockDeviceMapping := make([]computing.BlockDeviceMappingOfDescribeInstances, len(blockDeviceInfo))
+	blockDeviceInfo := resp.BlockDeviceMapping
+	blockDeviceMapping := make([]types.BlockDeviceMapping, len(blockDeviceInfo))
 	for i, device := range blockDeviceInfo {
-		ebs := &computing.EbsOfDescribeInstances{}
+		ebs := &types.Ebs{}
 		if device.Ebs != nil {
 			ebs.AttachTime = device.Ebs.AttachTime
 			ebs.DeleteOnTermination = device.Ebs.DeleteOnTermination
 			ebs.Status = device.Ebs.Status
 			ebs.VolumeId = device.Ebs.VolumeId
 		}
-		blockDeviceMapping[i] = computing.BlockDeviceMappingOfDescribeInstances{
+		blockDeviceMapping[i] = types.BlockDeviceMapping{
 			DeviceName: device.DeviceName,
 			Ebs:        ebs,
 		}
@@ -627,13 +621,13 @@ func (c *cloud) setBlockDeviceMapping(ctx context.Context, instance *computing.I
 	return nil
 }
 
-func (c *cloud) getVolume(ctx context.Context, input *computing.DescribeVolumesInput) (*computing.VolumeSet, error) {
-	response, err := c.computing.DescribeVolumesRequest(input).Send(ctx)
+func (c *cloud) getVolume(ctx context.Context, input *computing.DescribeVolumesInput) (*types.VolumeSet, error) {
+	response, err := c.computing.DescribeVolumes(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
-	volumes := response.DescribeVolumesOutput.VolumeSet
+	volumes := response.VolumeSet
 	if l := len(volumes); l > 1 {
 		return nil, ErrMultiDisks
 	} else if l < 1 {
@@ -644,20 +638,18 @@ func (c *cloud) getVolume(ctx context.Context, input *computing.DescribeVolumesI
 }
 
 func (c *cloud) getDeviceNameFromVolumeID(ctx context.Context, instanceID, volumeID string) (string, error) {
-	request := c.computing.DescribeInstanceAttributeRequest(
-		&computing.DescribeInstanceAttributeInput{
-			InstanceId: nifcloud.String(instanceID),
-			Attribute:  computing.AttributeOfDescribeInstanceAttributeRequestBlockDeviceMapping,
-		},
-	)
-	response, err := request.Send(ctx)
+	input := &computing.DescribeInstanceAttributeInput{
+		InstanceId: nifcloud.String(instanceID),
+		Attribute:  types.AttributeOfDescribeInstanceAttributeRequestBlockDeviceMapping,
+	}
+	resp, err := c.computing.DescribeInstanceAttribute(ctx, input)
 	if err != nil {
 		return "", fmt.Errorf("error getting block device mapping: %v", err)
 	}
 
-	for _, blockDevice := range response.BlockDeviceMapping {
-		if nifcloud.StringValue(blockDevice.Ebs.VolumeId) == volumeID {
-			return nifcloud.StringValue(blockDevice.DeviceName), nil
+	for _, blockDevice := range resp.BlockDeviceMapping {
+		if nifcloud.ToString(blockDevice.Ebs.VolumeId) == volumeID {
+			return nifcloud.ToString(blockDevice.DeviceName), nil
 		}
 	}
 
@@ -668,10 +660,9 @@ func (c *cloud) getDeviceNameFromVolumeID(ctx context.Context, instanceID, volum
 // and has the given code. More information on AWS error codes at:
 // NOTICE: nifcloud-sdk-go-v2 uses the aws-sdk-go-v2 error type
 func isAWSError(err error, code string) bool {
-	if awsError, ok := err.(awserr.Error); ok {
-		if awsError.Code() == code {
-			return true
-		}
+	var awsErr smithy.APIError
+	if errors.As(err, &awsErr) && awsErr.ErrorCode() == code {
+		return true
 	}
 	return false
 }
@@ -694,10 +685,10 @@ func roundUpCapacity(capacityGiB int64) int64 {
 	return (capacityGiB/unit + 1) * unit
 }
 
-func getVolumeAttachedInstanceID(volume *computing.VolumeSet) string {
+func getVolumeAttachedInstanceID(volume *types.VolumeSet) string {
 	var attachedInstanceID string
 	if len(volume.AttachmentSet) == 1 {
-		attachedInstanceID = nifcloud.StringValue(volume.AttachmentSet[0].InstanceId)
+		attachedInstanceID = nifcloud.ToString(volume.AttachmentSet[0].InstanceId)
 	} else {
 		attachedInstanceID = ""
 	}
