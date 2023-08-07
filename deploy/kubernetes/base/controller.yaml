@@ -62,13 +62,13 @@ spec:
             periodSeconds: 10
             failureThreshold: 5
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.3.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.5.0
           args:
             - --csi-address=$(ADDRESS)
             - --v=5
             - --feature-gates=Topology=true
-            - --enable-leader-election
-            - --leader-election-type=leases
+            - --leader-election=true
+            - --default-fstype=ext4
             - --timeout=60s
           env:
             - name: ADDRESS
@@ -77,10 +77,11 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v1.2.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.3.0
           args:
             - --csi-address=$(ADDRESS)
             - --v=5
+            - --leader-election=true
             - --timeout=60s
           env:
             - name: ADDRESS
@@ -89,11 +90,11 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-resizer
-          image: quay.io/k8scsi/csi-resizer:v1.0.0
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.8.0
           args:
             - --csi-address=$(ADDRESS)
             - --v=5
-            - --leader-election
+            - --leader-election=true
             - --timeout=60s
           env:
             - name: ADDRESS
@@ -102,7 +103,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: liveness-probe
-          image: quay.io/k8scsi/livenessprobe:v1.1.0
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.10.0
           args:
             - --csi-address=/csi/csi.sock
           volumeMounts:
