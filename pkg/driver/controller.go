@@ -197,9 +197,6 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 
 	devicePath, err := d.cloud.AttachDisk(ctx, volumeID, nodeID)
 	if err != nil {
-		if err == cloud.ErrAlreadyExists {
-			return nil, status.Error(codes.AlreadyExists, err.Error())
-		}
 		return nil, status.Errorf(codes.Internal, "Could not attach volume %q to node %q: %v", volumeID, nodeID, err)
 	}
 	klog.V(5).Infof("ControllerPublishVolume: volume %s attached to node %s through device %s", volumeID, nodeID, devicePath)

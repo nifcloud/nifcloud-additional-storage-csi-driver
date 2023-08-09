@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/util"
 	"github.com/aws/smithy-go"
-	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
 	"github.com/nifcloud/nifcloud-sdk-go/nifcloud"
 	"github.com/nifcloud/nifcloud-sdk-go/service/computing"
 	"github.com/nifcloud/nifcloud-sdk-go/service/computing/types"
@@ -250,7 +250,11 @@ func (c *cloud) AttachDisk(ctx context.Context, volumeID, nodeID string) (string
 	resp, err := c.computing.AttachVolume(ctx, input)
 	if err != nil {
 		if isAWSError(err, "Server.Inoperable.Volume.AlreadyAttached") {
-			return "", ErrAlreadyExists
+			deviceName, err := c.getDeviceNameFromVolumeID(ctx, nodeID, volumeID)
+			if err != nil {
+				return "", fmt.Errorf("could not fetch the device name for already attached volume: %v", err)
+			}
+			return deviceName, nil
 		}
 		return "", fmt.Errorf("could not attach volume %q to node %q: %v", volumeID, nodeID, err)
 	}
