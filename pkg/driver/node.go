@@ -574,6 +574,10 @@ func (n *nodeService) scanStorageDevices() error {
 	scanTargets := []string{"/sys/class/scsi_host", "/sys/devices"}
 	for _, target := range scanTargets {
 		err := filepath.Walk(target, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
 			if info.IsDir() {
 				return nil
 			}
@@ -631,7 +635,7 @@ func (n *nodeService) removeStorageDevice(dev string) error {
 func (n *nodeService) rescanStorageDevice(dev string) error {
 	rescanDevicePath := filepath.Join("/sys/block/", filepath.Base(dev), "/device/rescan")
 	if _, err := os.Stat(rescanDevicePath); err != nil {
-		return fmt.Errorf("Target device %q not found in /sys/block: %w", dev, err)
+		return fmt.Errorf("target device %q not found in /sys/block: %w", dev, err)
 	}
 
 	f, err := os.OpenFile(rescanDevicePath, os.O_WRONLY, os.ModePerm)
