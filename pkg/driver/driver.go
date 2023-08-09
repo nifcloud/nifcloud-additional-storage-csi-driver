@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
@@ -19,8 +18,6 @@ const (
 	// TopologyKey is key
 	TopologyKey = "topology." + DriverName + "/zone"
 )
-
-var execCommand = exec.Command
 
 // Driver is CSI driver object
 type Driver struct {
