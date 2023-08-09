@@ -6,12 +6,11 @@ import (
 
 	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	awsdriver "github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/driver"
 	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
 	gcpcommon "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pkg/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -93,7 +92,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		switch strings.ToLower(key) {
 		case "fstype":
 			klog.Warning("\"fstype\" is deprecated, please use \"csi.storage.k8s.io/fstype\" instead")
-		case awsdriver.VolumeTypeKey:
+		case VolumeTypeKey:
 			volumeType = value
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "Invalid parameter key %s for CreateVolume", key)
@@ -200,7 +199,7 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 	}
 	klog.V(5).Infof("ControllerPublishVolume: volume %s attached to node %s through device %s", volumeID, nodeID, devicePath)
 
-	pvInfo := map[string]string{awsdriver.DevicePathKey: devicePath}
+	pvInfo := map[string]string{DevicePathKey: devicePath}
 	return &csi.ControllerPublishVolumeResponse{PublishContext: pvInfo}, nil
 }
 
@@ -271,6 +270,33 @@ func (d *controllerService) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	return &csi.ListVolumesResponse{
 		Entries: entries,
+	}, nil
+}
+
+func (d *controllerService) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	klog.V(4).Infof("ControllerGetVolume: called with args %+v", *req)
+
+	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
+	}
+
+	disk, err := d.cloud.GetDiskByID(ctx, volumeID)
+	if err != nil {
+		if err == cloud.ErrNotFound {
+			return nil, status.Error(codes.NotFound, "Volume not found")
+		}
+		return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)
+	}
+
+	return &csi.ControllerGetVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId:      disk.VolumeID,
+			CapacityBytes: util.GiBToBytes(disk.CapacityGiB),
+		},
+		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+			PublishedNodeIds: []string{disk.AttachedInstanceID},
+		},
 	}, nil
 }
 

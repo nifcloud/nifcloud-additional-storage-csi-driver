@@ -12,16 +12,14 @@ import (
 
 	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	awsdriver "github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/driver"
 	gcpcommon "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pkg/common"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/resizefs"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 )
 
 const (
@@ -124,7 +122,7 @@ func (n *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 	defer n.volumeLocks.Release(volumeID)
 
-	devicePath, ok := req.PublishContext[awsdriver.DevicePathKey]
+	devicePath, ok := req.PublishContext[DevicePathKey]
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, "Device path not provided")
 	}
@@ -237,11 +235,7 @@ func (n *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Errorf(codes.Internal, "Could not rescan the device of %s: %v", devicePath, err)
 	}
 
-	r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
-		Interface: mount.New(""),
-		Exec:      exec.New(),
-	})
-
+	r := mount.NewResizeFs(exec.New())
 	if _, err := r.Resize(devicePath, req.GetVolumePath()); err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not resize volume %q (%q): %v", volumeID, devicePath, err)
 	}
@@ -427,7 +421,7 @@ func (n *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 func (n *nodeService) nodePublishVolumeForBlock(req *csi.NodePublishVolumeRequest, mountOptions []string) error {
 	target := req.GetTargetPath()
 
-	devicePath, exists := req.PublishContext[awsdriver.DevicePathKey]
+	devicePath, exists := req.PublishContext[DevicePathKey]
 	if !exists {
 		return status.Error(codes.InvalidArgument, "Device path not provided")
 	}
