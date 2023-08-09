@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
+	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/driver/internal"
+	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/util"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-sigs/aws-ebs-csi-driver/pkg/util"
-	gcpcommon "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pkg/common"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
@@ -30,9 +30,9 @@ var (
 )
 
 type controllerService struct {
-	cloud       cloud.Cloud
-	volumeLocks *gcpcommon.VolumeLocks
-	instanceID  string
+	cloud      cloud.Cloud
+	inFlight   *internal.InFlight
+	instanceID string
 }
 
 func newControllerService(instanceID string) controllerService {
@@ -42,9 +42,9 @@ func newControllerService(instanceID string) controllerService {
 	}
 
 	return controllerService{
-		cloud:       cloud,
-		instanceID:  instanceID,
-		volumeLocks: gcpcommon.NewVolumeLocks(),
+		cloud:      cloud,
+		instanceID: instanceID,
+		inFlight:   internal.NewInFlight(),
 	}
 }
 
@@ -68,6 +68,11 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if !isValidVolumeCapabilities(volCaps) {
 		return nil, status.Error(codes.InvalidArgument, "Volume capabilities not supported")
 	}
+
+	if ok := d.inFlight.Insert(volName); !ok {
+		return nil, status.Errorf(codes.Aborted, "Create volume request for %s is already in progress", volName)
+	}
+	defer d.inFlight.Delete(volName)
 
 	disk, err := d.cloud.GetDiskByName(ctx, volName, volSizeBytes)
 	if err != nil {
@@ -136,10 +141,10 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	if acquire := d.volumeLocks.TryAcquire(volumeID); !acquire {
-		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	if ok := d.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
-	defer d.volumeLocks.Release(volumeID)
+	defer d.inFlight.Delete(volumeID)
 
 	if _, err := d.cloud.DeleteDisk(ctx, volumeID); err != nil {
 		if err == cloud.ErrNotFound {
@@ -185,10 +190,10 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 		return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)
 	}
 
-	if acquire := d.volumeLocks.TryAcquire(volumeID); !acquire {
-		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	if ok := d.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
-	defer d.volumeLocks.Release(volumeID)
+	defer d.inFlight.Delete(volumeID)
 
 	devicePath, err := d.cloud.AttachDisk(ctx, volumeID, nodeID)
 	if err != nil {
@@ -215,10 +220,10 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 		return nil, status.Error(codes.InvalidArgument, "Node ID not provided")
 	}
 
-	if acquire := d.volumeLocks.TryAcquire(volumeID); !acquire {
-		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	if ok := d.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
-	defer d.volumeLocks.Release(volumeID)
+	defer d.inFlight.Delete(volumeID)
 
 	if err := d.cloud.DetachDisk(ctx, volumeID, nodeID); err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not detach volume %q from node %q: %v", volumeID, nodeID, err)
