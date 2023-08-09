@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
+	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/driver/internal"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	gcpcommon "github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/pkg/common"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -55,10 +55,10 @@ var (
 
 // nodeService represents the node service of CSI driver
 type nodeService struct {
-	cloud       cloud.Cloud
-	mounter     Mounter
-	volumeLocks *gcpcommon.VolumeLocks
-	instanceID  string
+	cloud      cloud.Cloud
+	mounter    Mounter
+	inFlight   *internal.InFlight
+	instanceID string
 }
 
 // newNodeService creates a new node service
@@ -70,10 +70,10 @@ func newNodeService(instanceID string) nodeService {
 	}
 
 	return nodeService{
-		cloud:       cloud,
-		mounter:     newNodeMounter(),
-		volumeLocks: gcpcommon.NewVolumeLocks(),
-		instanceID:  instanceID,
+		cloud:      cloud,
+		mounter:    newNodeMounter(),
+		inFlight:   internal.NewInFlight(),
+		instanceID: instanceID,
 	}
 }
 
@@ -117,10 +117,13 @@ func (n *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		fsType = defaultFsType
 	}
 
-	if acquire := n.volumeLocks.TryAcquire(volumeID); !acquire {
-		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	if ok := n.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
-	defer n.volumeLocks.Release(volumeID)
+	defer func() {
+		klog.V(4).InfoS("NodeStageVolume: volume operation finished", "volumeID", volumeID)
+		n.inFlight.Delete(volumeID)
+	}()
 
 	devicePath, ok := req.PublishContext[DevicePathKey]
 	if !ok {
@@ -192,10 +195,13 @@ func (n *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		klog.Warningf("NodeUnstageVolume: found %d references to device %s mounted at target path %s", refCount, dev, target)
 	}
 
-	if acquire := n.volumeLocks.TryAcquire(volumeID); !acquire {
-		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	if ok := n.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
-	defer n.volumeLocks.Release(volumeID)
+	defer func() {
+		klog.V(4).InfoS("NodeUnStageVolume: volume operation finished", "volumeID", volumeID)
+		n.inFlight.Delete(volumeID)
+	}()
 
 	klog.V(5).Infof("NodeUnstageVolume: unmounting %s", target)
 	err = n.mounter.Unmount(target)
@@ -269,10 +275,13 @@ func (n *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Errorf(codes.InvalidArgument, "Volume capability not supported: %v", volCap)
 	}
 
-	if acquire := n.volumeLocks.TryAcquire(volumeID); !acquire {
-		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	if ok := n.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
-	defer n.volumeLocks.Release(volumeID)
+	defer func() {
+		klog.V(4).InfoS("NodePublishVolume: volume operation finished", "volumeId", volumeID)
+		n.inFlight.Delete(volumeID)
+	}()
 
 	mountOptions := []string{"bind"}
 	if req.GetReadonly() {
@@ -305,10 +314,13 @@ func (n *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
 
-	if acquire := n.volumeLocks.TryAcquire(volumeID); !acquire {
-		return nil, status.Errorf(codes.Aborted, "The operation for volume id %q is now in progress", volumeID)
+	if ok := n.inFlight.Insert(volumeID); !ok {
+		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
 	}
-	defer n.volumeLocks.Release(volumeID)
+	defer func() {
+		klog.V(4).InfoS("NodeUnPublishVolume: volume operation finished", "volumeId", volumeID)
+		n.inFlight.Delete(volumeID)
+	}()
 
 	klog.V(5).Infof("NodeUnpublishVolume: unmounting %s", target)
 	err := n.mounter.Unmount(target)
