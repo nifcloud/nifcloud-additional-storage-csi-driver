@@ -1,5 +1,5 @@
 PKG=github.com/aokumasan/nifcloud-additional-storage-csi-driver
-IMAGE?=aokumasan/nifcloud-additional-storage-csi-driver
+IMAGE?=ghcr.io/aokumasan/nifcloud-additional-storage-csi-driver
 VERSION=v0.0.5
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
