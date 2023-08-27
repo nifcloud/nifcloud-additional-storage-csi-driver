@@ -284,6 +284,9 @@ func (c *cloud) DetachDisk(ctx context.Context, volumeID, nodeID string) error {
 		Agreement:  nifcloud.Bool(true),
 	}
 	if _, err := c.computing.DetachVolume(ctx, input); err != nil {
+		if isAWSError(err, "Client.Inoperable.Volume.DetachedFromInstance") {
+			return nil
+		}
 		return fmt.Errorf("could not detach volume %q from node %q: %v", volumeID, nodeID, err)
 	}
 
