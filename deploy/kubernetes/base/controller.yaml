@@ -23,7 +23,7 @@ spec:
           operator: Exists
       containers:
         - name: nifcloud-storage-driver
-          image: aokumasan/nifcloud-additional-storage-csi-driver:latest
+          image: ghcr.io/aokumasan/nifcloud-additional-storage-csi-driver:latest
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr

@@ -25,7 +25,7 @@ spec:
         - name: nifcloud-storage-driver
           securityContext:
             privileged: true
-          image: aokumasan/nifcloud-additional-storage-csi-driver:latest
+          image: ghcr.io/aokumasan/nifcloud-additional-storage-csi-driver:latest
           args:
             - --endpoint=$(CSI_ENDPOINT)
             - --logtostderr
