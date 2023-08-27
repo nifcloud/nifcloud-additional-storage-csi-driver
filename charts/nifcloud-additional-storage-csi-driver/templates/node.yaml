@@ -1,0 +1,179 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: nifcloud-additional-storage-csi-node
+  labels:
+    {{- include "nifcloud-additional-storage-csi-driver.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: nifcloud-additional-storage-csi-node
+      {{- include "nifcloud-additional-storage-csi-driver.selectorLabels" . | nindent 6 }}
+  updateStrategy:
+    {{- toYaml .Values.node.updateStrategy | nindent 4 }}
+  template:
+    metadata:
+      labels:
+        app: nifcloud-additional-storage-csi-node
+        {{- include "nifcloud-additional-storage-csi-driver.selectorLabels" . | nindent 8 }}
+      {{- with .Values.node.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        {{- with .Values.node.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      serviceAccount: {{ .Values.node.serviceAccount.name }}
+      priorityClassName: {{ .Values.node.priorityClassName }}
+      {{- with default .Values.node.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        {{- with .Values.node.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      securityContext:
+        {{- toYaml .Values.node.podSecurityContext | nindent 8 }}
+      containers:
+        - name: node-plugin
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --logtostderr
+            - --v={{ .Values.controller.logLevel }}
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:/csi/csi.sock
+            - name: NIFCLOUD_REGION
+              value: {{ required "NIFCLOUD region is required" .Values.nifcloud.region }}
+            - name: NIFCLOUD_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "NIFCLOUD access key id secret name is required" .Values.nifcloud.accessKeyId.secretName }}
+                  key: {{ required "NIFCLOUD access key id secret key is required " .Values.nifcloud.accessKeyId.key }}
+            - name: NIFCLOUD_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "NIFCLOUD secret access key id secret name is required" .Values.nifcloud.secretAccessKey.secretName }}
+                  key: {{ required "NIFCLOUD secret access key id secret key is required" .Values.nifcloud.secretAccessKey.key }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            {{- with .Values.node.extraEnv }}
+            {{- . | toYaml | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: kubelet-dir
+              mountPath: /var/lib/kubelet
+              mountPropagation: Bidirectional
+            - name: plugin-dir
+              mountPath: /csi
+            - name: device-dir
+              mountPath: /dev
+            - name: sys-dir
+              mountPath: /sys
+          ports:
+            - name: healthz
+              containerPort: 9808
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 10
+            failureThreshold: 5
+          {{- with .Values.node.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.node.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        - name: node-driver-registrar
+          image: {{ .Values.sidecars.nodeDriverRegistrar.image.repository }}:{{ .Values.sidecars.nodeDriverRegistrar.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+            - --v={{ .Values.sidecars.nodeDriverRegistrar.logLevel }}
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/additional-storage.csi.nifcloud.com/csi.sock
+          lifecycle:
+            preStop:
+              exec:
+                command: 
+                  - "/bin/sh"
+                  - "-c"
+                  - "rm -rf /registration/additional-storage.csi.nifcloud.com-reg.sock /csi/csi.sock"
+          livenessProbe:
+            exec:
+              command:
+                - /csi-node-driver-registrar
+                - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+                - --mode=kubelet-registration-probe
+            initialDelaySeconds: 30
+            timeoutSeconds: 15
+            periodSeconds: 90
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+          {{- with .Values.sidecars.nodeDriverRegistrar.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sidecars.nodeDriverRegistrar.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        - name: liveness-probe
+          image: {{ .Values.sidecars.livenessProbe.image.repository }}:{{ .Values.sidecars.livenessProbe.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --csi-address=/csi/csi.sock
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /csi
+          {{- with .Values.sidecars.livenessProbe.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sidecars.livenessProbe.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: kubelet-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        - name: plugin-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/additional-storage.csi.nifcloud.com/
+            type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: Directory
+        - name: device-dir
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: sys-dir
+          hostPath:
+            path: /sys
+            type: Directory
+
