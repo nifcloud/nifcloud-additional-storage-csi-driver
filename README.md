@@ -13,7 +13,7 @@ The driver implementation refers to [aws-ebs-csi-driver](https://github.com/kube
 The following CSI gRPC calls are implemented:
 
 - **Controller Service**: CreateVolume, DeleteVolume, ControllerPublishVolume, ControllerUnpublishVolume, ControllerExpandVolume, ControllerGetCapabilities, ValidateVolumeCapabilities
-- **NodeService**: NodeStageVolume, NodeUnstageVolume, NodePublishVolume, NodeUnpublishVolume, NodeExpandVolume, NodeGetCapabilities, NodeGetInfo
+- **NodeService**: NodeStageVolume, NodeUnstageVolume, NodePublishVolume, NodeUnpublishVolume, NodeExpandVolume, NodeGetCapabilities, NodeGetInfo, NodeGetVolumeStats
 - **Identity Service**: GetPluginInfo, GetPluginCapabilities, Probe
 
 ## CreateVolume Parameters
