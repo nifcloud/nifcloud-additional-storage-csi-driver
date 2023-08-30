@@ -1,0 +1,182 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nifcloud-additional-storage-csi-controller
+  labels:
+    {{- include "nifcloud-additional-storage-csi-driver.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controller.replicaCount }}
+  {{- with .Values.controller.updateStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: nifcloud-additional-storage-csi-controller
+      {{- include "nifcloud-additional-storage-csi-driver.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: nifcloud-additional-storage-csi-controller
+        {{- include "nifcloud-additional-storage-csi-driver.selectorLabels" . | nindent 8 }}
+      {{- with .Values.controller.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        {{- with .Values.controller.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      serviceAccount: {{ .Values.controller.serviceAccount.name }}
+      priorityClassName: {{ .Values.controller.priorityClassName }}
+      {{- with default .Values.controller.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        {{- with .Values.controller.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      securityContext:
+        {{- toYaml .Values.controller.podSecurityContext | nindent 8 }}
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --logtostderr
+            - --v={{ .Values.controller.logLevel }}
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: NIFCLOUD_REGION
+              value: {{ required "NIFCLOUD region is required" .Values.nifcloud.region }}
+            - name: NIFCLOUD_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "NIFCLOUD access key id secret name is required" .Values.nifcloud.accessKeyId.secretName }}
+                  key: {{ required "NIFCLOUD access key id secret key is required " .Values.nifcloud.accessKeyId.key }}
+            - name: NIFCLOUD_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "NIFCLOUD secret access key id secret name is required" .Values.nifcloud.secretAccessKey.secretName }}
+                  key: {{ required "NIFCLOUD secret access key id secret key is required" .Values.nifcloud.secretAccessKey.key }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            {{- with .Values.controller.extraEnv }}
+            {{- . | toYaml | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+          ports:
+            - name: healthz
+              containerPort: 9808
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 10
+            failureThreshold: 5
+          {{- with .Values.controller.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.controller.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        - name: csi-provisioner
+          image: {{ .Values.sidecars.provisioner.image.repository }}:{{ .Values.sidecars.provisioner.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --csi-address=$(ADDRESS)
+            - --v={{ .Values.sidecars.provisioner.logLevel }}
+            - --feature-gates=Topology=true
+            - --leader-election=true
+            - --default-fstype={{ .Values.controller.defaultFsType }}
+            - --timeout={{ .Values.sidecars.provisioner.timeout }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.sidecars.provisioner.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sidecars.provisioner.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        - name: csi-attacher
+          image: {{ .Values.sidecars.attacher.image.repository }}:{{ .Values.sidecars.attacher.image.tag }}
+          args:
+            - --csi-address=$(ADDRESS)
+            - --v={{ .Values.sidecars.attacher.logLevel }}
+            - --leader-election=true
+            - --timeout={{ .Values.sidecars.attacher.timeout }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.sidecars.attacher.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sidecars.attacher.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        - name: csi-resizer
+          image: {{ .Values.sidecars.resizer.image.repository }}:{{ .Values.sidecars.resizer.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --csi-address=$(ADDRESS)
+            - --v={{ .Values.sidecars.resizer.logLevel }}
+            - --leader-election=true
+            - --timeout={{ .Values.sidecars.resizer.timeout }}
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+          {{- with .Values.sidecars.resizer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sidecars.resizer.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        - name: liveness-probe
+          image: {{ .Values.sidecars.livenessProbe.image.repository }}:{{ .Values.sidecars.livenessProbe.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --csi-address=/csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+          {{- with .Values.sidecars.livenessProbe.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.sidecars.livenessProbe.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
