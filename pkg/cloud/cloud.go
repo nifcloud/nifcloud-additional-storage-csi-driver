@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/util"
 	"github.com/aws/smithy-go"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/util"
 	"github.com/nifcloud/nifcloud-sdk-go/nifcloud"
 	"github.com/nifcloud/nifcloud-sdk-go/service/computing"
 	"github.com/nifcloud/nifcloud-sdk-go/service/computing/types"

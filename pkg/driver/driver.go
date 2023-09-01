@@ -6,8 +6,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/util"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/util"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 )
