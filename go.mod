@@ -1,4 +1,4 @@
-module github.com/aokumasan/nifcloud-additional-storage-csi-driver
+module github.com/nifcloud/nifcloud-additional-storage-csi-driver
 
 go 1.20
 

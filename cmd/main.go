@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/driver"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/driver"
 	"k8s.io/klog/v2"
 )
 

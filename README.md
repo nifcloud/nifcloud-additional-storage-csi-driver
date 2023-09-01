@@ -76,12 +76,12 @@ standard-flash-a
    ```
 2. Add helm repository.
    ```sh
-   helm repo add nifcloud-additional-storage-csi-driver https://raw.githubusercontent.com/aokumasan/nifcloud-additional-storage-csi-driver/main/charts
+   helm repo add nifcloud-additional-storage-csi-driver https://raw.githubusercontent.com/nifcloud/nifcloud-additional-storage-csi-driver/main/charts
    helm repo update
    ```
 3. Install.
    - Please change the parameter `<REGION>` to your environment.
-   - See [values.yaml](https://github.com/aokumasan/nifcloud-additional-storage-csi-driver/blob/main/charts/nifcloud-additional-storage-csi-driver/values.yaml) for configurable values.
+   - See [values.yaml](https://github.com/nifcloud/nifcloud-additional-storage-csi-driver/blob/main/charts/nifcloud-additional-storage-csi-driver/values.yaml) for configurable values.
    ```sh
    helm upgrade --install nifcloud-additional-storage-csi-driver nifcloud-additional-storage-csi-driver/nifcloud-additional-storage-csi-driver \
      --namespace kube-system \

@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/driver/internal"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/cloud"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/driver/internal"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

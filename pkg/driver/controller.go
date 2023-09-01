@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/cloud"
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/driver/internal"
-	"github.com/aokumasan/nifcloud-additional-storage-csi-driver/pkg/util"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/cloud"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/driver/internal"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
