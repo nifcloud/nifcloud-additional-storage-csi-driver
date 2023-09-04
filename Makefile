@@ -1,6 +1,6 @@
 PKG=github.com/nifcloud/nifcloud-additional-storage-csi-driver
 IMAGE?=ghcr.io/nifcloud/nifcloud-additional-storage-csi-driver
-VERSION=v0.1.0
+VERSION=$(shell git describe --tags --dirty --match="v*")
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/pkg/driver.driverVersion=${VERSION} -X ${PKG}/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/driver.buildDate=${BUILD_DATE} -s -w"
