@@ -1,6 +1,7 @@
 PKG=github.com/nifcloud/nifcloud-additional-storage-csi-driver
 IMAGE?=ghcr.io/nifcloud/nifcloud-additional-storage-csi-driver
 VERSION=$(shell git describe --tags --dirty --match="v*")
+CHART_VERSION=${VERSION:v%=%}
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/pkg/driver.driverVersion=${VERSION} -X ${PKG}/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/pkg/driver.buildDate=${BUILD_DATE} -s -w"
@@ -19,4 +20,4 @@ push:
 	docker push $(IMAGE):$(VERSION)
 
 helm-package:
-	cd charts; helm package nifcloud-additional-storage-csi-driver
+	cd charts; helm package nifcloud-additional-storage-csi-driver -d ../.cr-release-packages --version=${CHART_VERSION} --app-version=${VERSION}

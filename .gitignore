@@ -1,4 +1,5 @@
 /bin
+/.cr-release-packages
 
 # Binaries for programs and plugins
 *.exe
