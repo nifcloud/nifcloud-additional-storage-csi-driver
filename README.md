@@ -76,7 +76,7 @@ standard-flash-a
    ```
 2. Add helm repository.
    ```sh
-   helm repo add nifcloud-additional-storage-csi-driver https://raw.githubusercontent.com/nifcloud/nifcloud-additional-storage-csi-driver/main/charts
+   helm repo add nifcloud-additional-storage-csi-driver https://nifcloud.github.io/nifcloud-additional-storage-csi-driver/
    helm repo update
    ```
 3. Install.
