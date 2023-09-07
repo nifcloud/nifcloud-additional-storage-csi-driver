@@ -1,74 +1,93 @@
-package driver
+package driver_test
 
 import (
 	"context"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/stretchr/testify/assert"
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/driver"
 )
 
-func TestDriver_GetPluginInfo(t *testing.T) {
-	d := &Driver{}
+var _ = Describe("identity", func() {
 
-	ctx := context.Background()
-	req := &csi.GetPluginInfoRequest{}
+	Describe("GetPluginInfo", func() {
+		BeforeEach(func() {
+			driver.SetupVersion()
+		})
 
-	want := &csi.GetPluginInfoResponse{
-		Name:          DriverName,
-		VendorVersion: driverVersion,
-	}
+		AfterEach(func() {
+			driver.ResetVersion()
+		})
 
-	got, err := d.GetPluginInfo(ctx, req)
+		Context("valid", func() {
+			It("should return GetPluginInfoResponse", func() {
+				ctx := context.Background()
+				req := &csi.GetPluginInfoRequest{}
 
-	if assert.NoError(t, err) {
-		assert.Equal(t, want, got)
-	}
-}
+				expected := &csi.GetPluginInfoResponse{
+					Name:          driver.DriverName,
+					VendorVersion: driver.TestDriverVersion,
+				}
 
-func TestDriver_GetPluginCapabilities(t *testing.T) {
-	d := &Driver{}
+				d := &driver.Driver{}
+				actual, err := d.GetPluginInfo(ctx, req)
 
-	ctx := context.Background()
-	req := &csi.GetPluginCapabilitiesRequest{}
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(actual).Should(Equal(expected))
+			})
+		})
+	})
 
-	want := &csi.GetPluginCapabilitiesResponse{
-		Capabilities: []*csi.PluginCapability{
-			{
-				Type: &csi.PluginCapability_Service_{
-					Service: &csi.PluginCapability_Service{
-						Type: csi.PluginCapability_Service_CONTROLLER_SERVICE,
+	Describe("GetPluginCapabilities", func() {
+		Context("valid", func() {
+			It("should return GetPluginCapabilitiesResponse", func() {
+				ctx := context.Background()
+				req := &csi.GetPluginCapabilitiesRequest{}
+
+				expected := &csi.GetPluginCapabilitiesResponse{
+					Capabilities: []*csi.PluginCapability{
+						{
+							Type: &csi.PluginCapability_Service_{
+								Service: &csi.PluginCapability_Service{
+									Type: csi.PluginCapability_Service_CONTROLLER_SERVICE,
+								},
+							},
+						},
+						{
+							Type: &csi.PluginCapability_Service_{
+								Service: &csi.PluginCapability_Service{
+									Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
+								},
+							},
+						},
 					},
-				},
-			},
-			{
-				Type: &csi.PluginCapability_Service_{
-					Service: &csi.PluginCapability_Service{
-						Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
-					},
-				},
-			},
-		},
-	}
+				}
 
-	got, err := d.GetPluginCapabilities(ctx, req)
+				d := &driver.Driver{}
+				actual, err := d.GetPluginCapabilities(ctx, req)
 
-	if assert.NoError(t, err) {
-		assert.Equal(t, want, got)
-	}
-}
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(actual).Should(Equal(expected))
+			})
+		})
+	})
 
-func TestDriver_Probe(t *testing.T) {
-	d := &Driver{}
+	Describe("Probe", func() {
+		Context("valid", func() {
+			It("should return ProbeResponse", func() {
+				ctx := context.Background()
+				req := &csi.ProbeRequest{}
 
-	ctx := context.Background()
-	req := &csi.ProbeRequest{}
+				expected := &csi.ProbeResponse{}
 
-	want := &csi.ProbeResponse{}
+				d := &driver.Driver{}
+				actual, err := d.Probe(ctx, req)
 
-	got, err := d.Probe(ctx, req)
-
-	if assert.NoError(t, err) {
-		assert.Equal(t, want, got)
-	}
-}
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(actual).Should(Equal(expected))
+			})
+		})
+	})
+})
