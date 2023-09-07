@@ -11,7 +11,7 @@ build:
 	CGO_ENABLED=0 GOOS=linux go build -ldflags ${LDFLAGS} -o bin/nifcloud-additional-storage-csi-driver ./cmd/
 
 test:
-	go test -cover ./...
+	ginkgo run --cover -coverprofile=cover.out -covermode=count --junit-report junit-report.xml ./...
 
 image:
 	docker build -t $(IMAGE):$(VERSION) .
