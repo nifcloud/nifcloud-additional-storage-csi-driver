@@ -1,59 +1,79 @@
-package driver
+package driver_test
 
 import (
 	"fmt"
 	"runtime"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/driver"
 )
 
-func setup() {
-	driverVersion = "testversion"
-	gitCommit = "testcommit"
-	buildDate = "testdate"
-}
+var _ = Describe("version", func() {
+	Describe("GetVersion", func() {
 
-func reset() {
-	driverVersion = ""
-	gitCommit = ""
-	buildDate = ""
-}
+		BeforeEach(func() {
+			driver.SetupVersion()
+		})
 
-func TestGetVersion(t *testing.T) {
-	setup()
-	defer reset()
+		AfterEach(func() {
+			driver.ResetVersion()
+		})
 
-	want := VersionInfo{
-		DriverVersion: "testversion",
-		GitCommit:     "testcommit",
-		BuildDate:     "testdate",
-		GoVersion:     runtime.Version(),
-		Compiler:      runtime.Compiler,
-		Platform:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-	}
+		Context("valid", func() {
+			It("should return Version", func() {
 
-	got := GetVersion()
+				expected := driver.VersionInfo{
+					DriverVersion: driver.TestDriverVersion,
+					GitCommit:     driver.TestGitCommit,
+					BuildDate:     driver.TestBuildDate,
+					GoVersion:     runtime.Version(),
+					Compiler:      runtime.Compiler,
+					Platform:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+				}
 
-	assert.Equal(t, want, got)
-}
+				actual := driver.GetVersion()
+				Expect(actual).Should(Equal(expected))
+			})
+		})
+	})
 
-func TestGetVersionJSON(t *testing.T) {
-	setup()
-	defer reset()
-
-	want := fmt.Sprintf(`{
-  "driverVersion": "testversion",
-  "gitCommit": "testcommit",
-  "buildDate": "testdate",
+	Describe("GetVersionJSON", func() {
+		const versionJsonFormat = `{
+  "driverVersion": "%s",
+  "gitCommit": "%s",
+  "buildDate": "%s",
   "goVersion": "%s",
   "compiler": "%s",
   "platform": "%s"
-}`, runtime.Version(), runtime.Compiler, fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
+}`
 
-	got, err := GetVersionJSON()
+		BeforeEach(func() {
+			driver.SetupVersion()
+		})
 
-	if assert.NoError(t, err) {
-		assert.Equal(t, want, got)
-	}
-}
+		AfterEach(func() {
+			driver.ResetVersion()
+		})
+
+		Context("valid", func() {
+			It("should return VersionJSON", func() {
+
+				expected := fmt.Sprintf(
+					versionJsonFormat,
+					driver.TestDriverVersion,
+					driver.TestGitCommit,
+					driver.TestBuildDate,
+					runtime.Version(),
+					runtime.Compiler,
+					fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+				)
+
+				actual, err := driver.GetVersionJSON()
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(actual).Should(Equal(expected))
+			})
+		})
+	})
+})
