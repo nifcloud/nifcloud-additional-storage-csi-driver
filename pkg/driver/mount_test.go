@@ -1,76 +1,56 @@
 package driver
 
 import (
-	"testing"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
-	"github.com/stretchr/testify/assert"
 	"k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 )
 
-func Test_newNodeMounter(t *testing.T) {
-	got := newNodeMounter()
-	if assert.NotNil(t, got) {
-		assert.IsType(t, &NodeMounter{}, got)
-	}
-}
+var _ = Describe("mount", func() {
+	Describe("GetDeviceName", func() {
+		var fakeMounter *mount.FakeMounter
 
-func TestNodeMounter_GetDeviceName(t *testing.T) {
-	fakeMounter := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
-			{
-				Device: "/dev/disk/by-path/testdisk",
-				Path:   "/mnt/test",
-			},
-		},
-	}
-	type args struct {
-		mountPath string
-	}
-	tests := []struct {
-		name         string
-		args         args
-		wantDevice   string
-		wantRefCount int
-		wantErr      bool
-	}{
-		{
-			name: "return device successfully",
-			args: args{
-				mountPath: "/mnt/test",
-			},
-			wantDevice:   "/dev/disk/by-path/testdisk",
-			wantRefCount: 1,
-		},
-		{
-			name: "return no device if no device was mounted on path",
-			args: args{
-				mountPath: "/mnt/notmounted",
-			},
-			wantDevice:   "",
-			wantRefCount: 0,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			m := &NodeMounter{
-				mount.SafeFormatAndMount{
-					Interface: fakeMounter,
-					Exec:      exec.New(),
+		BeforeEach(func() {
+			fakeMounter = &mount.FakeMounter{
+				MountPoints: []mount.MountPoint{
+					{
+						Device: "/dev/disk/by-path/testdisk",
+						Path:   "/mnt/test",
+					},
 				},
-				exec.New(),
-			}
-			got, got1, err := m.GetDeviceName(tt.args.mountPath)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NodeMounter.GetDeviceName() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.wantDevice {
-				t.Errorf("NodeMounter.GetDeviceName() got = %v, want %v", got, tt.wantDevice)
-			}
-			if got1 != tt.wantRefCount {
-				t.Errorf("NodeMounter.GetDeviceName() got1 = %v, want %v", got1, tt.wantRefCount)
 			}
 		})
-	}
-}
+
+		Context("valid", func() {
+			It("should return mounted device", func() {
+				m := &NodeMounter{
+					mount.SafeFormatAndMount{
+						Interface: fakeMounter,
+						Exec:      exec.New(),
+					},
+					exec.New(),
+				}
+				name, refCount, err := m.GetDeviceName("/mnt/test")
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(name).Should(Equal("/dev/disk/by-path/testdisk"))
+				Expect(refCount).Should(Equal(1))
+			})
+
+			It("should return no device if no device was mounted on path", func() {
+				m := &NodeMounter{
+					mount.SafeFormatAndMount{
+						Interface: fakeMounter,
+						Exec:      exec.New(),
+					},
+					exec.New(),
+				}
+				name, refCount, err := m.GetDeviceName("/mnt/notmounted")
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(name).Should(Equal(""))
+				Expect(refCount).Should(Equal(0))
+			})
+		})
+	})
+})
