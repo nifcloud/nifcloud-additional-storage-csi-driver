@@ -151,7 +151,7 @@ sidecars:
         cpu: 200m
         memory: 128Mi
     securityContext:
-      readOnlyRootFilesystem: true
+      readOnlyRootFilesystem: false
       allowPrivilegeEscalation: false
   livenessProbe:
     image:
