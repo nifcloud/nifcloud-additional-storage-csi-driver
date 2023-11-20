@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  lint-helm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint Helm chart
+        run: |
+          helm lint charts/nifcloud-additional-storage-csi-driver \
+            --set nifcloud.region=jp-east-1 \
+            --set nifcloud.accessKeyId.secretName=nifcloud-additional-storage-csi-secret \
+            --set nifcloud.accessKeyId.key=TESTACCESSKEYID \
+            --set nifcloud.secretAccessKey.secretName=nifcloud-additional-storage-csi-secret \
+            --set nifcloud.secretAccessKey.key=TESTSECRETACCESSKEY
+
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - name: Install ginkgo
+        run: go install github.com/onsi/ginkgo/v2/ginkgo
+
+      - name: Diff mod
+        run: go mod tidy && git diff --exit-code go.mod go.sum
+
+      - name: Build
+        run: make build
+
+      - name: Test
+        run: make test
