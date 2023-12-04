@@ -3,7 +3,6 @@ package driver
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -549,7 +548,7 @@ func (n *nodeService) findDevicePath(scsiID string) (string, error) {
 	deviceNumber := string(match[1])
 
 	deviceFileDir := "/dev/disk/by-path"
-	files, err := ioutil.ReadDir(deviceFileDir)
+	files, err := os.ReadDir(deviceFileDir)
 	if err != nil {
 		return "", fmt.Errorf("could not list the files in /dev/disk/by-path/: %w", err)
 	}
