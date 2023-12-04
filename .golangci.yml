@@ -1,0 +1,33 @@
+run:
+  tests: true
+  timeout: 10m
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - errorlint
+    - goimports
+    - revive
+    - gofmt
+    - goimports
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nolintlint
+    - prealloc
+    - staticcheck
+    - typecheck
+    - unparam
+    - unused
+
+linters-settings:
+  revive:
+    rules:
+      - name: package-comments
+        disabled: true
+  lll:
+    line-length: 200
