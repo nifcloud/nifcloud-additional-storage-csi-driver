@@ -150,13 +150,13 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		createType = VolumeTypeMapping[diskOptions.VolumeType]
 	case VolumeTypeHighSpeed:
 		types := []string{VolumeTypeHighSpeedA, VolumeTypeHighSpeedB}
-		createType = VolumeTypeMapping[types[rand.Intn(len(types))]]
+		createType = VolumeTypeMapping[types[rand.Intn(len(types))]] //nolint:gosec // Strong random is unnecessary
 	case VolumeTypeStandardFlash:
 		types := []string{VolumeTypeStandardFlashA, VolumeTypeStandardFlashB}
-		createType = VolumeTypeMapping[types[rand.Intn(len(types))]]
+		createType = VolumeTypeMapping[types[rand.Intn(len(types))]] //nolint:gosec // Strong random is unnecessary
 	case VolumeTypeHighSpeedFlash:
 		types := []string{VolumeTypeHighSpeedFlashA, VolumeTypeHighSpeedFlashB}
-		createType = VolumeTypeMapping[types[rand.Intn(len(types))]]
+		createType = VolumeTypeMapping[types[rand.Intn(len(types))]] //nolint:gosec // Strong random is unnecessary
 	case "":
 		createType = VolumeTypeMapping[DefaultVolumeType]
 	default:
