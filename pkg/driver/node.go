@@ -395,7 +395,7 @@ func (n *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 func (n *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	klog.V(4).Infof("NodeGetCapabilities: called with args %+v", *req)
-	var caps []*csi.NodeServiceCapability
+	caps := make([]*csi.NodeServiceCapability, len(nodeCaps))
 	for _, cap := range nodeCaps {
 		c := &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
