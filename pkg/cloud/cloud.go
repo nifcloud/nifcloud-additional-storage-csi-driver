@@ -357,7 +357,7 @@ func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
 	}
 
 	disks := []*Disk{}
-	for _, volume := range resp.VolumeSet {
+	for i, volume := range resp.VolumeSet {
 		// Volume name was setted in volume description.
 		// So use description to check this volume was created by Kubernetes CSI driver.
 		if !strings.HasPrefix(nifcloud.ToString(volume.Description), "pvc-") {
@@ -374,7 +374,7 @@ func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
 			VolumeID:           nifcloud.ToString(volume.VolumeId),
 			CapacityGiB:        int64(volSize),
 			AvailabilityZone:   nifcloud.ToString(volume.AvailabilityZone),
-			AttachedInstanceID: getVolumeAttachedInstanceID(&volume),
+			AttachedInstanceID: getVolumeAttachedInstanceID(&resp.VolumeSet[i]),
 		})
 	}
 
@@ -426,9 +426,9 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 	}
 
 	var volume *types.VolumeSet
-	for _, vol := range resp.VolumeSet {
+	for i, vol := range resp.VolumeSet {
 		if nifcloud.ToString(vol.Description) == name {
-			volume = &vol
+			volume = &resp.VolumeSet[i]
 		}
 	}
 	if volume == nil {
