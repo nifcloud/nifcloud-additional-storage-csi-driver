@@ -323,7 +323,7 @@ func (c *cloud) ResizeDisk(ctx context.Context, volumeID string, size int64) (in
 			VolumeId:    nifcloud.String(volumeID),
 		}
 		if _, err := c.computing.ExtendVolumeSize(ctx, input); err != nil {
-			klog.Errorf("ExtendVolumeSize returns an error: %w", err)
+			klog.Errorf("ExtendVolumeSize returns an error: %v", err)
 			return 0, err
 		}
 
@@ -336,7 +336,7 @@ func (c *cloud) ResizeDisk(ctx context.Context, volumeID string, size int64) (in
 
 		volume, err = c.GetDiskByID(ctx, volumeID)
 		if err != nil {
-			klog.Errorf("could not get the disk info from id: %w", err)
+			klog.Errorf("could not get the disk info from id: %v", err)
 			return 0, err
 		}
 		klog.V(4).Infof("after extend volume: current=%dGiB, desired=%dGiB", volume.CapacityGiB, desiredSize)
@@ -366,7 +366,7 @@ func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
 
 		volSize, err := strconv.Atoi(nifcloud.ToString(volume.Size))
 		if err != nil {
-			klog.Warningf("could not convert volume size %q. using 100GiB...: %w", nifcloud.ToString(volume.Size), err)
+			klog.Warningf("could not convert volume size %q. using 100GiB...: %v", nifcloud.ToString(volume.Size), err)
 			volSize = 100
 		}
 
