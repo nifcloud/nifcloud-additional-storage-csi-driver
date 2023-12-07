@@ -511,7 +511,7 @@ func (c *cloud) waitForVolume(ctx context.Context, volumeID, status string) erro
 		VolumeId: []string{volumeID},
 	}
 
-	err := wait.PollUntilContextTimeout(context.Background(), checkInterval, checkTimeout, false,
+	err := wait.PollUntilContextTimeout(ctx, checkInterval, checkTimeout, false,
 		func(context.Context) (done bool, err error) {
 			vol, err := c.getVolume(ctx, input)
 			if err != nil {
