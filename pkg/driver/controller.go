@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -76,11 +77,11 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	disk, err := d.cloud.GetDiskByName(ctx, volName, volSizeBytes)
 	if err != nil {
-		switch err {
-		case cloud.ErrNotFound:
-		case cloud.ErrMultiDisks:
+		switch {
+		case errors.Is(err, cloud.ErrNotFound):
+		case errors.Is(err, cloud.ErrMultiDisks):
 			return nil, status.Error(codes.Internal, err.Error())
-		case cloud.ErrDiskExistsDiffSize:
+		case errors.Is(err, cloud.ErrDiskExistsDiffSize):
 			return nil, status.Error(codes.AlreadyExists, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
@@ -125,7 +126,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	disk, err = d.cloud.CreateDisk(ctx, volName, opts)
 	if err != nil {
 		errCode := codes.Internal
-		if err == cloud.ErrNotFound {
+		if errors.Is(err, cloud.ErrNotFound) {
 			errCode = codes.NotFound
 		}
 		return nil, status.Errorf(errCode, "Could not create volume %q: %v", volName, err)
@@ -147,7 +148,7 @@ func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	defer d.inFlight.Delete(volumeID)
 
 	if _, err := d.cloud.DeleteDisk(ctx, volumeID); err != nil {
-		if err == cloud.ErrNotFound {
+		if errors.Is(err, cloud.ErrNotFound) {
 			klog.V(4).Info("DeleteVolume: volume not found, returning with success")
 			return &csi.DeleteVolumeResponse{}, nil
 		}
@@ -184,7 +185,7 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 	}
 
 	if _, err := d.cloud.GetDiskByID(ctx, volumeID); err != nil {
-		if err == cloud.ErrNotFound {
+		if errors.Is(err, cloud.ErrNotFound) {
 			return nil, status.Error(codes.NotFound, "Volume not found")
 		}
 		return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)
@@ -232,7 +233,7 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 
 func (d *controllerService) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	klog.V(4).Infof("ControllerGetCapabilities: called with args %+v", *req)
-	var caps []*csi.ControllerServiceCapability
+	caps := make([]*csi.ControllerServiceCapability, len(controllerCaps))
 	for _, cap := range controllerCaps {
 		c := &csi.ControllerServiceCapability{
 			Type: &csi.ControllerServiceCapability_Rpc{
@@ -285,7 +286,7 @@ func (d *controllerService) ControllerGetVolume(ctx context.Context, req *csi.Co
 
 	disk, err := d.cloud.GetDiskByID(ctx, volumeID)
 	if err != nil {
-		if err == cloud.ErrNotFound {
+		if errors.Is(err, cloud.ErrNotFound) {
 			return nil, status.Error(codes.NotFound, "Volume not found")
 		}
 		return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)
@@ -315,7 +316,7 @@ func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req 
 	}
 
 	if _, err := d.cloud.GetDiskByID(ctx, volumeID); err != nil {
-		if err == cloud.ErrNotFound {
+		if errors.Is(err, cloud.ErrNotFound) {
 			return nil, status.Error(codes.NotFound, "Volume not found")
 		}
 		return nil, status.Errorf(codes.Internal, "Could not get volume with ID %q: %v", volumeID, err)

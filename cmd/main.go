@@ -3,17 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/driver"
 	"k8s.io/klog/v2"
 )
-
-func init() {
-	rand.Seed(time.Now().Unix())
-}
 
 func main() {
 	var (

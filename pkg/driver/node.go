@@ -3,7 +3,6 @@ package driver
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -395,7 +394,7 @@ func (n *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 func (n *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	klog.V(4).Infof("NodeGetCapabilities: called with args %+v", *req)
-	var caps []*csi.NodeServiceCapability
+	caps := make([]*csi.NodeServiceCapability, len(nodeCaps))
 	for _, cap := range nodeCaps {
 		c := &csi.NodeServiceCapability{
 			Type: &csi.NodeServiceCapability_Rpc{
@@ -525,7 +524,7 @@ func (n *nodeService) getBlockSizeBytes(devicePath string) (int64, error) {
 	cmd := n.mounter.(*NodeMounter).Exec.Command("blockdev", "--getsize64", devicePath)
 	output, err := cmd.Output()
 	if err != nil {
-		return -1, fmt.Errorf("error when getting size of block volume at path %s: output: %s, err: %v", devicePath, string(output), err)
+		return -1, fmt.Errorf("error when getting size of block volume at path %s: output: %s, err: %w", devicePath, string(output), err)
 	}
 
 	strOut := strings.TrimSpace(string(output))
@@ -549,9 +548,9 @@ func (n *nodeService) findDevicePath(scsiID string) (string, error) {
 	deviceNumber := string(match[1])
 
 	deviceFileDir := "/dev/disk/by-path"
-	files, err := ioutil.ReadDir(deviceFileDir)
+	files, err := os.ReadDir(deviceFileDir)
 	if err != nil {
-		return "", fmt.Errorf("could not list the files in /dev/disk/by-path/: %v", err)
+		return "", fmt.Errorf("could not list the files in /dev/disk/by-path/: %w", err)
 	}
 
 	devicePath := ""
@@ -560,7 +559,7 @@ func (n *nodeService) findDevicePath(scsiID string) (string, error) {
 		if deviceFileRegexp.MatchString(f.Name()) {
 			devicePath, err = filepath.EvalSymlinks(filepath.Join(deviceFileDir, f.Name()))
 			if err != nil {
-				return "", fmt.Errorf("could not eval symlynk for %q: %v", f.Name(), err)
+				return "", fmt.Errorf("could not eval symlynk for %q: %w", f.Name(), err)
 			}
 		}
 	}
@@ -613,7 +612,7 @@ func (n *nodeService) scanStorageDevices() error {
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("failed to scan devices: %v", err)
+			return fmt.Errorf("failed to scan devices: %w", err)
 		}
 	}
 
