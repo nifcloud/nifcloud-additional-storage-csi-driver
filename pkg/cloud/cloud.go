@@ -258,7 +258,7 @@ func (c *cloud) AttachDisk(ctx context.Context, volumeID, nodeID string) (string
 		}
 		return "", fmt.Errorf("could not attach volume %q to node %q: %w", volumeID, nodeID, err)
 	}
-	klog.V(5).Infof("AttachVolume volume=%q instance=%q request returned %w", volumeID, nodeID, resp)
+	klog.V(5).Infof("AttachVolume volume=%q instance=%q request returned %v", volumeID, nodeID, resp)
 
 	// This is the only situation where we taint the device
 	if err := c.WaitForAttachmentState(ctx, volumeID, "attached"); err != nil {
