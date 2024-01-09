@@ -16,13 +16,17 @@ const (
 
 // RoundUpBytes rounds up the volume size in bytes upto multiplications of GiB
 // in the unit of Bytes
-func RoundUpBytes(volumeSizeBytes int64) int64 {
-	return roundUpSize(volumeSizeBytes, GiB) * GiB
+func RoundUpBytes(volumeSizeBytes int64) (int64, error) {
+	bytes, err := roundUpSize(volumeSizeBytes, GiB)
+	if err != nil {
+		return bytes, err
+	}
+	return bytes * GiB, nil
 }
 
 // RoundUpGiB rounds up the volume size in bytes upto multiplications of GiB
 // in the unit of GiB
-func RoundUpGiB(volumeSizeBytes int64) int64 {
+func RoundUpGiB(volumeSizeBytes int64) (int64, error) {
 	return roundUpSize(volumeSizeBytes, GiB)
 }
 
@@ -59,7 +63,14 @@ func ParseEndpoint(endpoint string) (string, string, error) {
 	return scheme, addr, nil
 }
 
-// TODO: check division by zero and int overflow
-func roundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
-	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes
+func roundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) (int64, error) {
+	// commonly, round up for negative value is allowed, but unnecessary in this project
+	if volumeSizeBytes < 0 {
+		return 0, fmt.Errorf("volumeSizeBytes should 0 or more")
+	} else if allocationUnitBytes <= 0 {
+		return 0, fmt.Errorf("allocationUnitBytes should grater than 0")
+	} else if (volumeSizeBytes + allocationUnitBytes - 1) < 0 {
+		return 0, fmt.Errorf("roundUpSize value overflows int64")
+	}
+	return (volumeSizeBytes + allocationUnitBytes - 1) / allocationUnitBytes, nil
 }

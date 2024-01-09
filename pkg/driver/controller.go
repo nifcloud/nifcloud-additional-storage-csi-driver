@@ -343,7 +343,11 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
 	}
 
-	newSize := util.RoundUpBytes(capRange.GetRequiredBytes())
+	newSize, err := util.RoundUpBytes(capRange.GetRequiredBytes())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Failed to round-up volume size: %v", err)
+	}
+
 	maxVolSize := capRange.GetLimitBytes()
 	if maxVolSize > 0 && maxVolSize < newSize {
 		return nil, status.Error(codes.InvalidArgument, "After round-up, volume size exceeds the limit specified")
@@ -436,7 +440,10 @@ func getVolSizeBytes(req *csi.CreateVolumeRequest) (int64, error) {
 	if capRange == nil {
 		volSizeBytes = cloud.DefaultVolumeSize
 	} else {
-		volSizeBytes = util.RoundUpBytes(capRange.GetRequiredBytes())
+		volSizeBytes, err := util.RoundUpBytes(capRange.GetRequiredBytes())
+		if err != nil {
+			return 0, status.Errorf(codes.InvalidArgument, "Failed to round-up volume size: %v", err)
+		}
 		maxVolSize := capRange.GetLimitBytes()
 		if maxVolSize > 0 && maxVolSize < volSizeBytes {
 			return 0, status.Error(codes.InvalidArgument, "After round-up, volume size exceeds the limit specified")
