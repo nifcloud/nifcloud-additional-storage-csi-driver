@@ -7,7 +7,8 @@ const (
 
 // constants of keys in volume parameters
 const (
-	VolumeTypeKey = "type"
+	VolumeTypeKey     = "type"
+	AccountingTypeKey = "accountingtype"
 )
 
 // constants for default command line flag values

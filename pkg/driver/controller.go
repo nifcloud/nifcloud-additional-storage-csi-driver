@@ -93,13 +93,19 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return newCreateVolumeResponse(disk), nil
 	}
 
-	var volumeType string
+	var (
+		volumeType     string
+		accountingType string
+	)
+
 	for key, value := range req.GetParameters() {
 		switch strings.ToLower(key) {
 		case "fstype":
 			klog.Warning("\"fstype\" is deprecated, please use \"csi.storage.k8s.io/fstype\" instead")
 		case VolumeTypeKey:
 			volumeType = value
+		case AccountingTypeKey:
+			accountingType = value
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "Invalid parameter key %s for CreateVolume", key)
 		}
@@ -118,9 +124,10 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// create a new volume
 	opts := &cloud.DiskOptions{
-		CapacityBytes: volSizeBytes,
-		VolumeType:    volumeType,
-		Zone:          zone,
+		AccountingType: accountingType,
+		CapacityBytes:  volSizeBytes,
+		VolumeType:     volumeType,
+		Zone:           zone,
 	}
 
 	disk, err = d.cloud.CreateDisk(ctx, volName, opts)
