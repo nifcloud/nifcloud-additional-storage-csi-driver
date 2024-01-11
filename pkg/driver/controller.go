@@ -435,19 +435,19 @@ func newCreateVolumeResponse(disk *cloud.Disk) *csi.CreateVolumeResponse {
 }
 
 func getVolSizeBytes(req *csi.CreateVolumeRequest) (int64, error) {
-	var volSizeBytes int64
 	capRange := req.GetCapacityRange()
 	if capRange == nil {
-		volSizeBytes = cloud.DefaultVolumeSize
-	} else {
-		volSizeBytes, err := util.RoundUpBytes(capRange.GetRequiredBytes())
-		if err != nil {
-			return 0, status.Errorf(codes.InvalidArgument, "Failed to round-up volume size: %v", err)
-		}
-		maxVolSize := capRange.GetLimitBytes()
-		if maxVolSize > 0 && maxVolSize < volSizeBytes {
-			return 0, status.Error(codes.InvalidArgument, "After round-up, volume size exceeds the limit specified")
-		}
+		return cloud.DefaultVolumeSize, nil
 	}
+
+	volSizeBytes, err := util.RoundUpBytes(capRange.GetRequiredBytes())
+	if err != nil {
+		return 0, status.Errorf(codes.InvalidArgument, "Failed to round-up volume size: %v", err)
+	}
+	maxVolSize := capRange.GetLimitBytes()
+	if maxVolSize > 0 && maxVolSize < volSizeBytes {
+		return 0, status.Error(codes.InvalidArgument, "After round-up, volume size exceeds the limit specified")
+	}
+
 	return volSizeBytes, nil
 }
