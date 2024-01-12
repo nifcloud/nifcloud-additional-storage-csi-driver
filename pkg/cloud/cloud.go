@@ -63,10 +63,31 @@ var (
 )
 
 const (
+	// Available accounting types
+	// doc: https://pfs.nifcloud.com/service/disk.htm
+
+	// AccountingTypeMonthly represents an accounting type monthly.
+	AccountingTypeMonthly = "monthly"
+	// AccountingTypeHourly represents an accounting type hourly.
+	AccountingTypeHourly = "hourly"
+)
+
+var (
+	// VolumeTypeMapping converts the volume identifier from volume type.
+	// More info: https://pfs.nifcloud.com/api/rest/CreateVolume.htm
+	AccountingTypeMapping = map[string]types.AccountingTypeOfCreateVolumeRequest{
+		AccountingTypeMonthly: types.AccountingTypeOfCreateVolumeRequestMonthly,
+		AccountingTypeHourly:  types.AccountingTypeOfCreateVolumeRequestHourly,
+	}
+)
+
+const (
 	// DefaultVolumeSize represents the default volume size.
 	DefaultVolumeSize int64 = 100 * util.GiB
 	// DefaultVolumeType specifies which storage to use for newly created volumes.
 	DefaultVolumeType = VolumeTypeStandardFlashA
+	// DefaultVolumeType specifies which storage to use for newly created volumes.
+	DefaultAccountingType = AccountingTypeHourly
 )
 
 var (
@@ -98,9 +119,10 @@ type Disk struct {
 
 // DiskOptions represents parameters to create an NIFCLOUD additional storage
 type DiskOptions struct {
-	CapacityBytes int64
-	VolumeType    string
-	Zone          string
+	AccountingType string
+	CapacityBytes  int64
+	VolumeType     string
+	Zone           string
 }
 
 // Instance represents a NIFCLOUD VM
@@ -163,6 +185,18 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 		return nil, fmt.Errorf("invalid NIFCLOUD VolumeType %q", diskOptions.VolumeType)
 	}
 
+	var accountingType types.AccountingTypeOfCreateVolumeRequest
+	switch diskOptions.AccountingType {
+	case AccountingTypeMonthly:
+		accountingType = types.AccountingTypeOfCreateVolumeRequestMonthly
+	case AccountingTypeHourly:
+		accountingType = types.AccountingTypeOfCreateVolumeRequestHourly
+	case "":
+		accountingType = AccountingTypeMapping[DefaultAccountingType]
+	default:
+		return nil, fmt.Errorf("invalid NIFCLOUD AccountingType %q", diskOptions.AccountingType)
+	}
+
 	zone := diskOptions.Zone
 	if zone == "" {
 		return nil, errors.New("Zone is required")
@@ -177,7 +211,7 @@ func (c *cloud) CreateDisk(ctx context.Context, volumeName string, diskOptions *
 	capacity := roundUpCapacity(util.BytesToGiB(diskOptions.CapacityBytes))
 
 	input := &computing.CreateVolumeInput{
-		AccountingType: types.AccountingTypeOfCreateVolumeRequestHourly, // TODO: set accounting type from diskoptions
+		AccountingType: accountingType,
 		DiskType:       createType,
 		InstanceId:     nifcloud.String(instanceID),
 		Size:           nifcloud.Int32(int32(capacity)),

@@ -61,6 +61,21 @@ Storage type (See https://pfs.nifcloud.com/service/disk.htm)
 
 standard-flash-a
 
+### accountingType
+
+#### description
+
+Accounting type (See https://pfs.nifcloud.com/service/disk.htm)
+
+#### values
+
+- monthly
+- hourly
+
+#### default
+
+hourly
+
 ## Installation
 
 1. Create Secret resource with an NIFCLOUD access key id and secret access key.
