@@ -382,15 +382,12 @@ func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req 
 
 func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	klog.V(4).Infof("ControllerExpandVolume: called with args %+v", *req)
-	volumeID := req.GetVolumeId()
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
+	if err := validateControllerExpandVolumeRequest(req); err != nil {
+		return nil, err
 	}
 
+	volumeID := req.GetVolumeId()
 	capRange := req.GetCapacityRange()
-	if capRange == nil {
-		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
-	}
 
 	newSize, err := util.RoundUpBytes(capRange.GetRequiredBytes())
 	if err != nil {
@@ -411,6 +408,18 @@ func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi
 		CapacityBytes:         util.GiBToBytes(actualSizeGiB),
 		NodeExpansionRequired: true,
 	}, nil
+}
+
+func validateControllerExpandVolumeRequest(req *csi.ControllerExpandVolumeRequest) error {
+	if len(req.GetVolumeId()) == 0 {
+		return status.Error(codes.InvalidArgument, "Volume ID not provided")
+	}
+
+	if req.GetCapacityRange() == nil {
+		return status.Error(codes.InvalidArgument, "Capacity range not provided")
+	}
+
+	return nil
 }
 
 func (d *controllerService) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
