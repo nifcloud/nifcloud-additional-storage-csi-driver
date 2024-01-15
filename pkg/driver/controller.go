@@ -184,25 +184,12 @@ func validateDeleteVolumeRequest(req *csi.DeleteVolumeRequest) error {
 
 func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	klog.V(4).Infof("ControllerPublishVolume: called with args %+v", *req)
+	if err := validateControllerPublishVolumeRequest(req); err != nil {
+		return nil, err
+	}
+
 	volumeID := req.GetVolumeId()
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
-	}
-
 	nodeID := req.GetNodeId()
-	if len(nodeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Node ID not provided")
-	}
-
-	volCap := req.GetVolumeCapability()
-	if volCap == nil {
-		return nil, status.Error(codes.InvalidArgument, "Volume capability not provided")
-	}
-
-	caps := []*csi.VolumeCapability{volCap}
-	if !isValidVolumeCapabilities(caps) {
-		return nil, status.Error(codes.InvalidArgument, "Volume capability not supported")
-	}
 
 	if !d.cloud.IsExistInstance(ctx, nodeID) {
 		return nil, status.Errorf(codes.NotFound, "Instance %q not found", nodeID)
@@ -228,6 +215,27 @@ func (d *controllerService) ControllerPublishVolume(ctx context.Context, req *cs
 
 	pvInfo := map[string]string{DevicePathKey: devicePath}
 	return &csi.ControllerPublishVolumeResponse{PublishContext: pvInfo}, nil
+}
+
+func validateControllerPublishVolumeRequest(req *csi.ControllerPublishVolumeRequest) error {
+	if len(req.GetVolumeId()) == 0 {
+		return status.Error(codes.InvalidArgument, "Volume ID not provided")
+	}
+
+	if len(req.GetNodeId()) == 0 {
+		return status.Error(codes.InvalidArgument, "Node ID not provided")
+	}
+
+	volCap := req.GetVolumeCapability()
+	if volCap == nil {
+		return status.Error(codes.InvalidArgument, "Volume capability not provided")
+	}
+
+	caps := []*csi.VolumeCapability{volCap}
+	if !isValidVolumeCapabilities(caps) {
+		return status.Error(codes.InvalidArgument, "Volume capability not supported")
+	}
+	return nil
 }
 
 func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
