@@ -354,15 +354,12 @@ func validateControllerGetVolumeRequest(req *csi.ControllerGetVolumeRequest) err
 
 func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	klog.V(4).Infof("ValidateVolumeCapabilities: called with args %+v", *req)
-	volumeID := req.GetVolumeId()
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
+	if err := validateValidateVolumeCapabilitiesRequest(req); err != nil {
+		return nil, err
 	}
 
+	volumeID := req.GetVolumeId()
 	volCaps := req.GetVolumeCapabilities()
-	if len(volCaps) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume capabilities not provided")
-	}
 
 	if _, err := d.cloud.GetDiskByID(ctx, volumeID); err != nil {
 		if errors.Is(err, cloud.ErrNotFound) {
@@ -378,6 +375,18 @@ func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req 
 	return &csi.ValidateVolumeCapabilitiesResponse{
 		Confirmed: confirmed,
 	}, nil
+}
+
+func validateValidateVolumeCapabilitiesRequest(req *csi.ValidateVolumeCapabilitiesRequest) error {
+	if len(req.GetVolumeId()) == 0 {
+		return status.Error(codes.InvalidArgument, "Volume ID not provided")
+	}
+
+	if len(req.GetVolumeCapabilities()) == 0 {
+		return status.Error(codes.InvalidArgument, "Volume capabilities not provided")
+	}
+
+	return nil
 }
 
 func (d *controllerService) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
