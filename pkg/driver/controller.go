@@ -51,9 +51,8 @@ func newControllerService(instanceID string) controllerService {
 
 func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	klog.V(4).Infof("CreateVolume: called with args %+v", *req)
-	volName := req.GetName()
-	if len(volName) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume name not provided")
+	if err := validateCreateVolumeRequest(req); err != nil {
+		return nil, err
 	}
 
 	volSizeBytes, err := getVolSizeBytes(req)
@@ -61,14 +60,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, err
 	}
 
-	volCaps := req.GetVolumeCapabilities()
-	if len(volCaps) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume capabilities not provided")
-	}
-
-	if !isValidVolumeCapabilities(volCaps) {
-		return nil, status.Error(codes.InvalidArgument, "Volume capabilities not supported")
-	}
+	volName := req.GetName()
 
 	if ok := d.inFlight.Insert(volName); !ok {
 		return nil, status.Errorf(codes.Aborted, "Create volume request for %s is already in progress", volName)
@@ -140,6 +132,23 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	return newCreateVolumeResponse(disk), nil
+}
+
+func validateCreateVolumeRequest(req *csi.CreateVolumeRequest) error {
+	volName := req.GetName()
+	if len(volName) == 0 {
+		return status.Error(codes.InvalidArgument, "Volume name not provided")
+	}
+
+	volCaps := req.GetVolumeCapabilities()
+	if len(volCaps) == 0 {
+		return status.Error(codes.InvalidArgument, "Volume capabilities not provided")
+	}
+
+	if !isValidVolumeCapabilities(volCaps) {
+		return status.Error(codes.InvalidArgument, "Volume capabilities not supported")
+	}
+	return nil
 }
 
 func (d *controllerService) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
