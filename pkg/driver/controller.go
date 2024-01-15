@@ -319,11 +319,11 @@ func (d *controllerService) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 func (d *controllerService) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	klog.V(4).Infof("ControllerGetVolume: called with args %+v", *req)
+	if err := validateControllerGetVolumeRequest(req); err != nil {
+		return nil, err
+	}
 
 	volumeID := req.GetVolumeId()
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
-	}
 
 	disk, err := d.cloud.GetDiskByID(ctx, volumeID)
 	if err != nil {
@@ -342,6 +342,14 @@ func (d *controllerService) ControllerGetVolume(ctx context.Context, req *csi.Co
 			PublishedNodeIds: []string{disk.AttachedInstanceID},
 		},
 	}, nil
+}
+
+func validateControllerGetVolumeRequest(req *csi.ControllerGetVolumeRequest) error {
+	if len(req.GetVolumeId()) == 0 {
+		return status.Error(codes.InvalidArgument, "Volume ID not provided")
+	}
+
+	return nil
 }
 
 func (d *controllerService) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
