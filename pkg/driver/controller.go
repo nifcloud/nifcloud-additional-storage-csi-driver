@@ -240,15 +240,12 @@ func validateControllerPublishVolumeRequest(req *csi.ControllerPublishVolumeRequ
 
 func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	klog.V(4).Infof("ControllerUnpublishVolume: called with args %+v", *req)
-	volumeID := req.GetVolumeId()
-	if len(volumeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
+	if err := validateControllerUnpublishVolumeRequest(req); err != nil {
+		return nil, err
 	}
 
+	volumeID := req.GetVolumeId()
 	nodeID := req.GetNodeId()
-	if len(nodeID) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Node ID not provided")
-	}
 
 	if ok := d.inFlight.Insert(volumeID); !ok {
 		return nil, status.Errorf(codes.Aborted, internal.VolumeOperationAlreadyExistsErrorMsg, volumeID)
@@ -261,6 +258,18 @@ func (d *controllerService) ControllerUnpublishVolume(ctx context.Context, req *
 	klog.V(5).Infof("ControllerUnpublishVolume: volume %s detached from node %s", volumeID, nodeID)
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
+}
+
+func validateControllerUnpublishVolumeRequest(req *csi.ControllerUnpublishVolumeRequest) error {
+	if len(req.GetVolumeId()) == 0 {
+		return status.Error(codes.InvalidArgument, "Volume ID not provided")
+	}
+
+	if len(req.GetNodeId()) == 0 {
+		return status.Error(codes.InvalidArgument, "Node ID not provided")
+	}
+
+	return nil
 }
 
 func (d *controllerService) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
