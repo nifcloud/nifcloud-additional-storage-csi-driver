@@ -321,6 +321,9 @@ func (c *cloud) DetachDisk(ctx context.Context, volumeID, nodeID string) error {
 		if isAWSError(err, "Client.Inoperable.Volume.DetachedFromInstance") {
 			return nil
 		}
+		if isAWSErrorVolumeNotFound(err) {
+			return ErrNotFound
+		}
 		return fmt.Errorf("could not detach volume %q from node %q: %w", volumeID, nodeID, err)
 	}
 
