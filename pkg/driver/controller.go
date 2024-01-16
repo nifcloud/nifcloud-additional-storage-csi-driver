@@ -36,8 +36,8 @@ type controllerService struct {
 	instanceID string
 }
 
-func newControllerService(instanceID string) controllerService {
-	cloud, err := cloud.NewCloud()
+func newControllerService(driverOptions *DriverOptions, instanceID string) controllerService {
+	cloud, err := cloud.NewCloud(driverOptions.nifcloudSdkDebugLog)
 	if err != nil {
 		panic(err)
 	}
