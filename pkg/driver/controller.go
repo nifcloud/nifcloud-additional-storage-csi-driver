@@ -135,8 +135,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 }
 
 func validateCreateVolumeRequest(req *csi.CreateVolumeRequest) error {
-	volName := req.GetName()
-	if len(volName) == 0 {
+	if len(req.GetName()) == 0 {
 		return status.Error(codes.InvalidArgument, "Volume name not provided")
 	}
 
