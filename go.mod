@@ -3,6 +3,7 @@ module github.com/nifcloud/nifcloud-additional-storage-csi-driver
 go 1.20
 
 require (
+	github.com/aws/aws-sdk-go-v2 v1.17.4
 	github.com/aws/smithy-go v1.14.0
 	github.com/container-storage-interface/spec v1.8.0
 	github.com/nifcloud/nifcloud-sdk-go v1.21.0
@@ -17,7 +18,6 @@ require (
 )
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.17.4 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect

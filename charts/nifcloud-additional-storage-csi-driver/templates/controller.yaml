@@ -47,6 +47,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - --endpoint=$(CSI_ENDPOINT)
+            {{- if .Values.controller.sdkDebugLog }}
+            - --nifcloud-sdk-debug-log=true
+            {{- end}}
             - --logtostderr
             - --v={{ .Values.controller.logLevel }}
           env:

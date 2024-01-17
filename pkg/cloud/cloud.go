@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/smithy-go"
 	"github.com/nifcloud/nifcloud-additional-storage-csi-driver/pkg/util"
 	"github.com/nifcloud/nifcloud-sdk-go/nifcloud"
@@ -154,11 +155,18 @@ type cloud struct {
 var _ Cloud = &cloud{}
 
 // NewCloud creates the cloud object.
-func NewCloud() (Cloud, error) {
+func NewCloud(nifcloudSdkDebugLog bool) (Cloud, error) {
 	accessKeyID := os.Getenv("NIFCLOUD_ACCESS_KEY_ID")
 	secretAccessKey := os.Getenv("NIFCLOUD_SECRET_ACCESS_KEY")
 	region := os.Getenv("NIFCLOUD_REGION")
 	cfg := nifcloud.NewConfig(accessKeyID, secretAccessKey, region)
+
+	if nifcloudSdkDebugLog {
+		cfg.ClientLogMode = aws.LogRequestWithBody | aws.LogRequestEventMessage |
+			aws.LogResponseWithBody | aws.LogResponseEventMessage |
+			aws.LogRetries
+	}
+
 	return &cloud{
 		region:    region,
 		computing: computing.NewFromConfig(cfg),

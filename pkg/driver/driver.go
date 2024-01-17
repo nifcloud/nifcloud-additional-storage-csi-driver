@@ -30,7 +30,8 @@ type Driver struct {
 
 // DriverOptions is option for CSI driver.
 type DriverOptions struct {
-	endpoint string
+	endpoint            string
+	nifcloudSdkDebugLog bool
 }
 
 // NewDriver creates the new CSI driver
@@ -43,15 +44,16 @@ func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
 	}
 
 	driverOptions := DriverOptions{
-		endpoint: DefaultCSIEndpoint,
+		endpoint:            DefaultCSIEndpoint,
+		nifcloudSdkDebugLog: false,
 	}
 	for _, option := range options {
 		option(&driverOptions)
 	}
 
 	driver := Driver{
-		controllerService: newControllerService(instanceID),
-		nodeService:       newNodeService(instanceID),
+		controllerService: newControllerService(&driverOptions, instanceID),
+		nodeService:       newNodeService(&driverOptions, instanceID),
 		options:           &driverOptions,
 	}
 
@@ -101,6 +103,13 @@ func (d *Driver) Stop() {
 func WithEndpoint(endpoint string) func(*DriverOptions) {
 	return func(o *DriverOptions) {
 		o.endpoint = endpoint
+	}
+}
+
+// WithNifcloudSdkDebugLog sets the nifcloud sdk debug log
+func WithNifcloudSdkDebugLog(nifcloudSdkDebugLog bool) func(*DriverOptions) {
+	return func(o *DriverOptions) {
+		o.nifcloudSdkDebugLog = nifcloudSdkDebugLog
 	}
 }
 

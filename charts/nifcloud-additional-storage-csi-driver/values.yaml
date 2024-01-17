@@ -40,6 +40,7 @@ controller:
   securityContext:
     readOnlyRootFilesystem: true
     allowPrivilegeEscalation: false
+  sdkDebugLog: false
   logLevel: 2
   resources:
     requests:
@@ -76,6 +77,7 @@ node:
   securityContext:
     privileged: true
     readOnlyRootFilesystem: true
+  sdkDebugLog: false
   logLevel: 2
   resources:
     requests:

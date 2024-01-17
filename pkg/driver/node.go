@@ -63,8 +63,8 @@ type nodeService struct {
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func newNodeService(instanceID string) nodeService {
-	cloud, err := cloud.NewCloud()
+func newNodeService(driverOptions *DriverOptions, instanceID string) nodeService {
+	cloud, err := cloud.NewCloud(driverOptions.nifcloudSdkDebugLog)
 	if err != nil {
 		panic(err)
 	}

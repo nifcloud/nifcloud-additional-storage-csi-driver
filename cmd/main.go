@@ -11,12 +11,14 @@ import (
 
 func main() {
 	var (
-		version  bool
-		endpoint string
+		version             bool
+		endpoint            string
+		nifcloudSdkDebugLog bool
 	)
 
 	flag.BoolVar(&version, "version", false, "Print the version and exit.")
 	flag.StringVar(&endpoint, "endpoint", driver.DefaultCSIEndpoint, "CSI Endpoint")
+	flag.BoolVar(&nifcloudSdkDebugLog, "nifcloud-sdk-debug-log", false, "To enable the nifcloud debug log level (default to false).")
 
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -32,6 +34,7 @@ func main() {
 
 	drv, err := driver.NewDriver(
 		driver.WithEndpoint(endpoint),
+		driver.WithNifcloudSdkDebugLog(nifcloudSdkDebugLog),
 	)
 	if err != nil {
 		klog.Fatalln(err)
