@@ -299,14 +299,10 @@ func (c *cloud) AttachDisk(ctx context.Context, volumeID, nodeID string) (string
 		return "", err
 	}
 
-	deviceName, err := c.getDeviceNameFromVolumeID(ctx, nodeID, volumeID)
+	deviceName, err := c.getDeviceNameFromUniqueID(ctx, nodeID, nifcloud.ToString(resp.InstanceUniqueId), nifcloud.ToString(resp.VolumeUniqueId))
 	if err != nil {
 		return "", fmt.Errorf("could not fetch the device name after attach volume: %w", err)
 	}
-
-	// TODO: Double check the attachment to be 100% sure we attached the correct volume at the correct mountpoint
-	// It could happen otherwise that we see the volume attached from a previous/separate AttachVolume call,
-	// which could theoretically be against a different device (or even instance).
 
 	return deviceName, nil
 }
@@ -699,6 +695,30 @@ func (c *cloud) getDeviceNameFromVolumeID(ctx context.Context, instanceID, volum
 	}
 
 	return "", fmt.Errorf("could not find device name for volume %q attached in %q", volumeID, instanceID)
+}
+
+func (c *cloud) getDeviceNameFromUniqueID(ctx context.Context, instanceID, instanceUniqueID, volumeUniqueID string) (string, error) {
+	input := &computing.DescribeInstanceAttributeInput{
+		InstanceId: nifcloud.String(instanceID),
+		Attribute:  types.AttributeOfDescribeInstanceAttributeRequestBlockDeviceMapping,
+	}
+	resp, err := c.computing.DescribeInstanceAttribute(ctx, input)
+	if err != nil {
+		return "", fmt.Errorf("error getting block device mapping: %w", err)
+	}
+
+	respInstanceUniqueId := nifcloud.ToString(resp.InstanceUniqueId)
+	if respInstanceUniqueId != instanceUniqueID {
+		return "", fmt.Errorf("could not match instanceUniqueId %q != %q in %q", respInstanceUniqueId, instanceUniqueID, instanceID)
+	}
+
+	for _, blockDevice := range resp.BlockDeviceMapping {
+		if nifcloud.ToString(blockDevice.Ebs.VolumeUniqueId) == volumeUniqueID {
+			return nifcloud.ToString(blockDevice.DeviceName), nil
+		}
+	}
+
+	return "", fmt.Errorf("could not find device name for volume %q attached in %q (%q)", volumeUniqueID, instanceID, instanceUniqueID)
 }
 
 // isAWSError returns a boolean indicating whether the error is AWS-related
