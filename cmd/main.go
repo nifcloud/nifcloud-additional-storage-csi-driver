@@ -26,7 +26,8 @@ func main() {
 	if version {
 		info, err := driver.GetVersionJSON()
 		if err != nil {
-			klog.Fatalln(err)
+			klog.ErrorS(err, "Failed to GetVersionJSON")
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 		fmt.Println(info)
 		os.Exit(0)
@@ -37,9 +38,11 @@ func main() {
 		driver.WithNifcloudSdkDebugLog(nifcloudSdkDebugLog),
 	)
 	if err != nil {
-		klog.Fatalln(err)
+		klog.ErrorS(err, "Failed to NewDriver")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	if err := drv.Run(); err != nil {
-		klog.Fatalln(err)
+		klog.ErrorS(err, "Failed to driver Run")
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 }

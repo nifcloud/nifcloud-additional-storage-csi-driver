@@ -300,7 +300,7 @@ func (c *cloud) AttachDisk(ctx context.Context, volumeID, nodeID string) (string
 		}
 		return "", fmt.Errorf("could not attach volume %q to node %q: %w", volumeID, nodeID, err)
 	}
-	klog.V(5).Infof("AttachVolume volume=%q instance=%q request returned %v", volumeID, nodeID, resp)
+	klog.V(5).InfoS("AttachVolume", "volumeID", volumeID, "nodeID", nodeID, "response", resp)
 
 	// This is the only situation where we taint the device
 	if err := c.WaitForAttachmentState(ctx, volumeID, "attached"); err != nil {
@@ -364,7 +364,7 @@ func (c *cloud) ResizeDisk(ctx context.Context, volumeID string, size int64) (in
 			VolumeId:    nifcloud.String(volumeID),
 		}
 		if _, err := c.computing.ExtendVolumeSize(ctx, input); err != nil {
-			klog.Errorf("ExtendVolumeSize returns an error: %v", err)
+			klog.ErrorS(err, "ExtendVolumeSize returns an error")
 			return 0, err
 		}
 
@@ -377,16 +377,16 @@ func (c *cloud) ResizeDisk(ctx context.Context, volumeID string, size int64) (in
 
 		volume, err = c.GetDiskByID(ctx, volumeID)
 		if err != nil {
-			klog.Errorf("could not get the disk info from id: %v", err)
+			klog.ErrorS(err, "Could not get the disk info from id")
 			return 0, err
 		}
-		klog.V(4).Infof("after extend volume: current=%dGiB, desired=%dGiB", volume.CapacityGiB, desiredSize)
+		klog.V(4).InfoS("After extend volume", "current", volume.CapacityGiB, "desired", desiredSize)
 		if volume.CapacityGiB >= desiredSize {
 			break
 		}
 	}
 
-	klog.V(4).Infof("resize succeeded! current volume size is %dGiB", volume.CapacityGiB)
+	klog.V(4).InfoS("Resize succeeded!", "currentVolumeGiB", volume.CapacityGiB)
 
 	return volume.CapacityGiB, nil
 }
@@ -394,7 +394,7 @@ func (c *cloud) ResizeDisk(ctx context.Context, volumeID string, size int64) (in
 func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
 	resp, err := c.computing.DescribeVolumes(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("clould not fetch the additional storages: %w", err)
+		return nil, fmt.Errorf("Clould not fetch the additional storages: %w", err)
 	}
 
 	disks := []*Disk{}
@@ -407,7 +407,7 @@ func (c *cloud) ListDisks(ctx context.Context) ([]*Disk, error) {
 
 		volSize, err := strconv.Atoi(nifcloud.ToString(volume.Size))
 		if err != nil {
-			klog.Warningf("could not convert volume size %q. using 100GiB...: %v", nifcloud.ToString(volume.Size), err)
+			klog.ErrorS(err, "Could not convert volume size. using 100GiB...", "volumeSize", nifcloud.ToString(volume.Size))
 			volSize = 100
 		}
 
@@ -447,7 +447,7 @@ func (c *cloud) WaitForAttachmentState(ctx context.Context, volumeID, state stri
 
 		for _, a := range volume.AttachmentSet {
 			if a.Status == nil {
-				klog.Warningf("Ignoring nil attachment state for volume %q: %v", volumeID, a)
+				klog.InfoS("Ignoring nil attachment state for volume", "volumeID", volumeID, "attachment", a)
 				continue
 			}
 			if *a.Status == state {
@@ -482,9 +482,11 @@ func (c *cloud) GetDiskByName(ctx context.Context, name string, capacityBytes in
 	}
 
 	if int64(volSizeGiB) != roundUpCapacity(util.BytesToGiB(capacityBytes)) {
-		klog.Warningf(
-			"disk size for %q is not same. request capacityBytes: %v != volume size: %v",
-			name, roundUpCapacity(util.BytesToGiB(capacityBytes)), volSizeGiB,
+		klog.InfoS(
+			"disk size is not same",
+			"name", name,
+			"requestCapacityBytes", roundUpCapacity(util.BytesToGiB(capacityBytes)),
+			"volumeSize", volSizeGiB,
 		)
 		return nil, ErrDiskExistsDiffSize
 	}
