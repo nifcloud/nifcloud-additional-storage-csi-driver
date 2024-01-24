@@ -36,7 +36,7 @@ type DriverOptions struct {
 
 // NewDriver creates the new CSI driver
 func NewDriver(options ...func(*DriverOptions)) (*Driver, error) {
-	klog.Infof("Driver: %v Version: %v", DriverName, driverVersion)
+	klog.InfoS("Driver:", "name", DriverName, "version", driverVersion)
 
 	instanceID, err := getInstanceID()
 	if err != nil {
@@ -75,7 +75,7 @@ func (d *Driver) Run() error {
 	logErr := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		resp, err := handler(ctx, req)
 		if err != nil {
-			klog.Errorf("GRPC error: %v", err)
+			klog.ErrorS(err, "GRPC error")
 		}
 		return resp, err
 	}
@@ -88,14 +88,14 @@ func (d *Driver) Run() error {
 	csi.RegisterControllerServer(d.srv, d)
 	csi.RegisterNodeServer(d.srv, d)
 
-	klog.Infof("Listening for connections on address: %#v", listener.Addr())
+	klog.InfoS("Listening for connections", "address", listener.Addr())
 
 	return d.srv.Serve(listener)
 }
 
 // Stop stops the server
 func (d *Driver) Stop() {
-	klog.Infof("Stopping server")
+	klog.InfoS("Stopping server")
 	d.srv.Stop()
 }
 

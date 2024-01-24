@@ -50,7 +50,9 @@ spec:
             {{- if .Values.controller.sdkDebugLog }}
             - --nifcloud-sdk-debug-log=true
             {{- end}}
-            - --logtostderr
+            {{- with .Values.controller.loggingFormat }}
+            - --logging-format={{ . }}
+            {{- end }}
             - --v={{ .Values.controller.logLevel }}
           env:
             - name: CSI_ENDPOINT
