@@ -6,8 +6,6 @@ The [NIFCLOUD Additional Storage](https://pfs.nifcloud.com/service/disk.htm) Con
 
 The driver implementation refers to [aws-ebs-csi-driver](https://github.com/kubernetes-sigs/aws-ebs-csi-driver).
 
-**Currently, this is alpha version. So we recommend do not use production environment.**
-
 ## Features
 
 The following CSI gRPC calls are implemented:
