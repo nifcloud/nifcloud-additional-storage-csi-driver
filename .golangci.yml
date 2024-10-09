@@ -31,3 +31,6 @@ linters-settings:
         disabled: true
   lll:
     line-length: 200
+  gosec:
+    excludes:
+      - G115
