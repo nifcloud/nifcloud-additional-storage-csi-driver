@@ -83,6 +83,8 @@ spec:
               mountPath: /dev
             - name: sys-dir
               mountPath: /sys
+            - name: tmp-dir
+              mountPath: /tmp
           ports:
             - name: healthz
               containerPort: 9808
@@ -181,4 +183,5 @@ spec:
           hostPath:
             path: /sys
             type: Directory
-
+        - name: tmp-dir
+          emptyDir: {}
