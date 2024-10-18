@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   nifcloud-additional-storage-csi-driver:
   - apiVersion: v2
+    appVersion: v1.1.0
+    created: "2024-10-18T10:35:25.288199314Z"
+    description: A Helm chart for nifcloud-additional-storage-csi-driver
+    digest: 20f796dc0041a6ae1983fc09343f88f6937c28bf4159fb027a4780760b376216
+    name: nifcloud-additional-storage-csi-driver
+    type: application
+    urls:
+    - https://github.com/nifcloud/nifcloud-additional-storage-csi-driver/releases/download/v1.1.0/nifcloud-additional-storage-csi-driver-1.1.0.tgz
+    version: 1.1.0
+  - apiVersion: v2
     appVersion: v1.0.0
     created: "2024-01-25T04:08:09.18576064Z"
     description: A Helm chart for nifcloud-additional-storage-csi-driver
@@ -41,4 +51,4 @@ entries:
     urls:
     - https://github.com/nifcloud/nifcloud-additional-storage-csi-driver/releases/download/v0.1.2/nifcloud-additional-storage-csi-driver-0.1.2.tgz
     version: 0.1.2
-generated: "2024-01-25T04:08:09.185780687Z"
+generated: "2024-10-18T10:35:25.288224601Z"
